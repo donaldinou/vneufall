@@ -1,0 +1,42 @@
+/**
+ * Install file of Ubercart ATOS Payment System
+ * By zmove
+ **/
+
+------------------------------------------------------
+INSTALLATION
+------------------------------------------------------
+
+1) Unrar your ATOS package
+2) Configure your pathfile as described in the installation guide you may have.
+3) FACULTATIVE : configure your parcom file, all important parameter are configured by the module.
+4) Upload your files in an "atos" directory on the root of your server.
+
+Bin files have to be in /atos
+Param files & pathfile have to be in /atos/param
+Log files have to be in /atos/log
+
+5) Give right CHMOD to your folder and files.
+log folder need 775 CHMOD
+atos folder need 755 CHMOD
+Binary need 654 CHMOD
+
+6) Enable the module
+7) Configure it in the payment system configuration
+8) Enjoy
+
+NB : Test it long time before call your bank and ask to be in production mode !
+
+-----------------------------------------------------
+FEATURES
+-----------------------------------------------------
+
+- Add a new radio button with a custom title and description when customer have to choose the payment system he need.
+- Load the list of Available credit card in checkout review. The user have to choose what kind of card he possess.
+- Internationalization : if the website is multilanguage, the API is called with the customer language parameter. If not available, the API is called with the language defined in settings.
+- Autoresponse : The order is validated just after the credit card number was validated, the customer don't have to click on "return to shop" button to validate order.
+- All transactions are logged : 
+ + into a .txt file named log_the-day-of-transaction.txt. The log files are in /atos/log
+ + into an admin comment
+
+I think that's all

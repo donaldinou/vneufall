@@ -1,0 +1,203 @@
+<?php
+// $Id: thumb.module,v 1.1 2008/11/24 09:28:45 davyvandenbremt Exp $
+
+// @todo allow local files (without compress/decompress)
+// @todo allow more phpthumb settings
+
+/**
+ * Implementation of hook_menu().
+ */
+function thumb_menu() {
+  $items = array();
+
+  $items[file_directory_path() .'/thumb'] = array(
+    'page callback' => 'thumb',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'file' => 'thumb.pages.inc',
+  );
+  $items['admin/build/thumb'] = array(
+    'title' => 'Thumb presets',
+    'description' => 'Administer thumb presets.',
+    'page callback' => 'thumb_presets_list',
+    'access arguments' => array('administer thumb'),
+    'file' => 'thumb.admin.inc',
+  );
+  $items['admin/build/thumb/list'] = array(
+    'title' => 'List',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items['admin/build/thumb/add'] = array(
+    'title' => 'Add new preset',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('thumb_presets_form'),
+    'access arguments' => array('administer thumb'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'thumb.admin.inc',
+  );
+  $items['admin/build/thumb/%thumb_preset/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('thumb_presets_form', 3),
+    'access arguments' => array('administer thumb'),
+    'type' => MENU_CALLBACK,
+    'file' => 'thumb.admin.inc',
+  );
+  $items['admin/build/thumb/%thumb_preset/flush'] = array(
+    'title' => 'Flush',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('thumb_flush_confirm_form', 3),
+    'access arguments' => array('administer thumb'),
+    'type' => MENU_CALLBACK,
+    'file' => 'thumb.admin.inc',
+  );
+  $items['admin/build/thumb/%thumb_preset/delete'] = array(
+    'title' => 'Flush',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('thumb_delete_confirm_form', 3),
+    'access arguments' => array('administer thumb'),
+    'type' => MENU_CALLBACK,
+    'file' => 'thumb.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Fetch a preset.
+ *
+ * @param $pid
+ *   The pid of the preset you want to fetch.
+ *
+ * @return
+ *   A preset object.
+ */
+function thumb_preset_load($pid = NULL) {
+  if (!$pid) return FALSE;
+
+  $preset = db_fetch_object(db_query("SELECT pid, identifier, description, data FROM {thumb_preset}", $pid));
+  if ($preset) {
+    $preset->data = unserialize($preset->data);
+    return $preset;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Get a list of all presets.
+ *
+ * @return
+ *   An array of presets indexed by the preset identifier.
+ */
+function thumb_presets() {
+  $presets = array();
+  $result = db_query("SELECT pid, identifier, description, data FROM {thumb_preset}");
+  while ($row = db_fetch_object($result)) {
+    $row->data = unserialize($row->data);
+    $presets[$row->identifier] = $row;
+  }
+  return $presets;
+}
+
+/**
+ * Generate the url of a thumbnail of an image for a certain preset.
+ *
+ * @param $presetname
+ *   The preset the thumbnail was generated for.
+ * @param $path
+ *   The path of the original image.
+ * @return
+ *   The url of the thumbnail.
+ */
+function thumb_url($presetname, $path) {
+  $pathinfo = pathinfo($path);
+  $ext = $pathinfo['extension'];
+  $url = file_directory_path() .'/thumb/'. $presetname .'/'. thumb_compress_string($path);
+  if (!empty($ext)) {
+     $url .= '.'. $ext;
+  }
+  return url($url);
+}
+
+/**
+ * Send an image as a response to the client.
+ *
+ * @param $path
+ *   A path of the image to send.
+ */
+function thumb_transfer($path) {
+  if (function_exists('mime_content_type')) {
+    $mime = mime_content_type($path);
+  }
+  else {
+    $size = getimagesize($path);
+    $mime = $size['mime'];
+  }
+  $headers = array('Content-Type: '. mime_header_encode($mime));
+
+  if ($fileinfo = stat($path)) {
+    $headers[] = 'Content-Length: '. $fileinfo[7];
+    _imagecache_cache_set_cache_headers($fileinfo, $headers);
+  }
+  file_transfer($path, $headers);
+  exit;
+}
+
+/**
+ * Encode an image path.
+ *
+ * @param $string
+ *   A path to encode.
+ * @return
+ *   The encoded path.
+ */
+function thumb_compress_string($string) {
+  $prefix = substr(md5($string), 0, 4);
+  $prefix = implode('/', array($prefix[0], $prefix[1], $prefix[2], $prefix[3]));
+  return $prefix .'/'. thumb_urlsafe_base64_encode($string);
+}
+
+/**
+ * Decode an encoded image path.
+ *
+ * @param $string
+ *   A path to decode.
+ * @return
+ *   The decoded path.
+ */
+function thumb_decompress_string($string) {
+  return substr(thumb_urlsafe_base64_decode($string), 6, strlen($string));
+}
+
+/**
+ * Encode a string with URL safe base 64.
+ *
+ * @param $string
+ *   A string to encode.
+ * @return
+ *   The encoded string.
+ */
+function thumb_urlsafe_base64_encode($string) {
+  $data = base64_encode($string);
+  $data = str_replace(array('+', '/', '='), array('-', '_', ''), $data);
+  return $data;
+}
+
+/**
+ * Decode a string encoded with URL safe base 64.
+ *
+ * @param $string
+ *   The encoded string.
+ * @return
+ *   The decoded string.
+ */
+function thumb_urlsafe_base64_decode($string) {
+  $data = str_replace(array('-', '_'), array('+', '/'), $string);
+  $mod4 = strlen($data) % 4;
+  if ($mod4) {
+    $data .= substr('====', $mod4);
+  }
+  return base64_decode($data);
+}

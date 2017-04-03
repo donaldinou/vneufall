@@ -1,0 +1,49 @@
+/* $Id: immobilier.css $ */
+
+/*
+** Pager mini
+*/
+.item-list .pager-mini {
+  clear: both;
+  text-align: center;
+}
+.item-list .pager-mini li {
+  background-image:none;
+  display:inline;
+  list-style-type:none;
+  padding: 0.5em;
+}
+
+/*
+** Admin
+*/
+
+.immobilier-fieldset-table {
+	margin:0;
+}
+
+.immobilier-fieldset-table TD {
+	padding:0;
+	vertical-align:top;
+	width:50%;
+}
+
+.immobilier-fieldset-table .form-item LABEL {
+	/*display: inline;*/
+	float:left;
+	margin:0 5px 0 0
+}
+
+#edit-adresse-wrapper LABEL {
+	display: block;
+	float: none;
+}
+
+.immobilier-fieldset-table .form-item LABEL.option {
+	float:none;
+}
+
+.immobilier-fieldset-table .form-item .form-text {
+	display: inline;
+	width:auto;
+}

@@ -1,0 +1,6 @@
+; 
+name = Vente
+description = Gestion des annonces de vente
+package = Immobilier
+dependencies[] = immobilier
+core = "6.x"

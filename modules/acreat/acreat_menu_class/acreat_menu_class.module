@@ -1,0 +1,38 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * hook_form_alter() 
+ */
+function acreat_menu_class_form_alter(&$form, $form_state, $form_id) {
+	switch($form_id) {
+		// ---
+		case "menu_edit_item":
+			$form["menu"]["css_class"] = array(
+				"#type" => "textfield",
+				"#title" => "Classe(s) CSS",
+				"#description" => "Déclaration de classes CSS qui seront attribuées à cet élément de menu",
+				"#default_value" => &$form["menu"]["#item"]["options"]["attributes"]["class"]
+			);
+			array_unshift($form['#submit'], 'acreat_menu_class_item_submit');
+		break;		
+		// ---
+	}
+}
+
+/*******************************************************************************
+ * FORMULAIRES / validate / submit 
+ ******************************************************************************/
+ 
+/**
+ * acreat_menu_class_item_submit
+ * @see acreat_menu_class_form_alter
+ */
+function acreat_menu_class_item_submit($form, &$form_state) {
+	$item = &$form_state['values']['menu'];
+	$item["options"]["attributes"]["class"] = $item["css_class"];
+	unset($item["css_class"]);
+}

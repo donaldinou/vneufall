@@ -1,0 +1,364 @@
+<?php
+// $Id: immobilier_subscription.module,v 1.0 2009/09/08 11:30:00$
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+ 
+/* 
+* Implémentation de hook_menu
+*/
+function immobilier_subscription_menu() {
+	$items = array();
+	$types = immobilier_get_types();
+	
+	// SUBSCRIBE/UNSUBSCRIBE
+	foreach($types as $type) {
+		// Inscription a l'alerte mail
+		$items[$type->type.'/subscribe'] = array(
+			'title' 			=> 'Inscription à la notification de nouvelles annonces',
+			'page callback' 	=> 'drupal_get_form',
+			'page arguments' 	=> array('immobilier_subscription_register_form', 0),
+			'access arguments' 	=> array('access content'),
+			'file'				=> 'immobilier_subscription.pages.inc',
+			'type'				=> MENU_CALLBACK,
+		);
+		
+		// Inscription a l'alerte mail
+		$items[$type->type.'/unsubscribe'] = array(
+			'title' 			=> 'Désinscription à la notification de nouvelles annonces',
+			'page callback' 	=> 'drupal_get_form',
+			'page arguments' 	=> array('immobilier_subscription_unregister_form'),
+			'access arguments' 	=> array('access content'),
+			'file'				=> 'immobilier_subscription.pages.inc',
+			'type'				=> MENU_CALLBACK,
+		);
+	}
+	
+	// ADMINISTRATION
+	$items['admin/immobilier/subscription'] = array(
+		'title' 			=> 'Notifications',
+		'description' 		=> 'Administration du module de notification de nouvelles annonces',
+		'page callback' 	=> 'immobilier_subscription_admin_list',
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier_subscription.admin.inc',
+	);
+	
+	$items['admin/immobilier/subscription/list'] = array(
+		'title' 		=> 'Liste des inscriptions',
+		'description' 	=> 'Liste des absonnement à la notification de nouvelles annonces',
+		'type'			=> MENU_DEFAULT_LOCAL_TASK,
+	);
+	
+	$items['admin/immobilier/subscription/settings'] = array(
+		'title' 			=> 'Paramètres',
+		'description' 		=> 'Paramètres du module de notification de nouvelles annonces',
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' 	=> array('immobilier_subscription_admin_settings_form'),
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier_subscription.admin.inc',
+		'weight'			=> 99,
+		'type'				=> MENU_LOCAL_TASK,
+	);
+	
+	$items['admin/immobilier/subscription/test'] = array(
+		'title' 			=> 'Test',
+		'description' 		=> 'Test du module de notification de nouvelles annonces',
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' 	=> array('immobilier_subscription_admin_test_form'),
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier_subscription.admin.inc',
+		'weight'			=> 99,
+		'type'				=> MENU_LOCAL_TASK,
+	);
+	
+	$items['admin/immobilier/subscription/%immobilier_subscription/deactivate'] = array(
+		'title' 			=> 'Désactiver un abonnement',
+		'page callback' 	=> 'immobilier_subscription_set_active',
+		'page arguments' 	=> array(3, false),
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier_subscription.admin.inc',
+	);
+	
+	$items['admin/immobilier/subscription/%immobilier_subscription/activate'] = array(
+		'title' 			=> 'Désactiver un abonnement',
+		'page callback' 	=> 'immobilier_subscription_set_active',
+		'page arguments' 	=> array(3, true),
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier_subscription.admin.inc',
+	);
+	
+	return $items;
+}
+
+/**
+* Implements hook_theme().
+*/
+function immobilier_subscription_theme() {
+	return array(
+		'immobilier_subscription_notification' => array(
+		  'arguments' => array('subscription' => NULL, 'nodes' => NULL),
+		  'template' => 'immobilier-subscription-notification'
+		),
+		'immobilier_subscription_notification_node' => array(
+		  'arguments' => array('node' => NULL),
+		  'template' => 'immobilier-subscription-notification-node'
+		),
+	);
+}
+/* 
+* Implémentation de hook_cron
+*/
+function immobilier_subscription_cron() {
+	$cron_last = variable_get('cron_last', mktime());
+	$count = 0;
+	
+	// reset du cache des nodes
+	node_load(false, null, true);
+	
+	// traitement des abonnements
+	$rs = db_query("SELECT sid FROM immo_subscription WHERE active = 1");
+	while($subscription = db_fetch_object($rs)) {
+		$subscription = immobilier_subscription_load($subscription->sid);
+		if(immobilier_subscription_process($subscription, $cron_last))
+			$count++;
+	}
+	
+	watchdog("immobilier", sprintf("%d notification(s) de nouvelle(s) annonce(s) envoyée(s).", $count));
+}
+
+/**
+* Implements hook_token_values()
+*/
+function immobilier_subscription_token_values($type, $object = NULL, $options = array()) {
+	switch ($type) {
+		case 'notification':
+			return (array)$object;
+	}
+}
+
+/**
+* Implements hook_token_list(). Documents the individual
+* tokens handled by the module.
+*/
+function immobilier_subscription_token_list($type = 'all') {
+	$tokens = array();
+		if ($type == 'notification' || $type == 'all') {
+			$tokens['notification']['count'] = "Nombre d'annonce présente dans la notification";
+		}
+	return $tokens;
+}
+/*
+* Implementation of hook_messaging.
+*/
+/*function immobilier_subscription_messaging($op, $arg0 = NULL, $arg1 = NULL) {
+  switch ($op) {
+    case 'message groups':
+      $info['immobilier-subscription-notification'] = array(
+        'module' => 'immobilier_subscription',
+        'name' => t('immobilier_subscription Notifications'),
+        'description' => t('Template for immobilier_subscription notifications.'),
+      );
+      return $info;
+      break;
+    case 'message keys':
+      if ($arg0 == 'immobilier-subscription-notification') {
+        return array(
+          'subject' => t('Subject'),
+          'header' => t('Header'),
+          'main' => t('Content'),
+          'footer' => t('Footer'),
+        );
+      }
+      break;
+    case 'messages':
+      if ($arg0 == 'immobilier-subscription-notification') {
+        return array(
+          'subject' => t('Notification for [website_url]'),
+          'header' => t("Greetings [user],"),
+          'main' => array(
+            t(''),
+            t("The website [website_url] has returned an error."),
+            t('You can log into your account at [site-url] for more details.'),
+          ),
+          'footer' => array(
+              t(''),
+              t('--'),
+              t('This is an automatic message, thank you for using [site-name]'),
+          ),
+        );
+      }
+      break;
+    case 'tokens':
+      $tokens = array();
+      // These are the token groups that will be used for this module's messages
+      if ($arg0 == 'immobilier-subscription-notification') {
+        $tokens = array('global', 'user', 'node', 'immobilier_subscription');
+      }
+      return $tokens;
+  }
+}*/
+
+
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * FORMULAIRES
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+    
+/*
+* immobilier_subscription_load
+*/
+function immobilier_subscription_load($sid) {
+	static $subscriptions;
+	if(!isset($subscriptions[$sid])) {
+		$subscription = db_fetch_object(db_query("SELECT * FROM immo_subscription WHERE sid = %d", array($sid)));
+		$subscription = drupal_unpack($subscription);
+		$subscription->search = $subscription->search ? unserialize($subscription->search) : false;
+		$subscription->data = $subscription->data ? unserialize($subscription->data) : false;
+		$subscription->unsubscribe = url($subscription->type."/unsubscribe",array("absolute" => true, "query" => array("mail" => $subscription->mail)));
+		$subscriptions[$sid] = $subscription;
+	}
+	return $subscriptions[$sid];
+}
+
+
+/*
+* immobilier_subscription_process
+*/
+function immobilier_subscription_process($subscription, $from = null) {
+
+	// options 
+	$options = $from ? array("where" => sprintf("n.created > %d", $from)) : null;
+	
+	// query
+	$query = immobilier_search_sql($subscription->type, $subscription->search, $options);
+	$query = preg_replace("/SELECT .* FROM/", "SELECT n.nid FROM", $query);
+	$rs = db_query($query);
+	$timestamp = time();
+	 
+	$nodes = array();
+	while($node = db_fetch_object($rs)) {
+		$stat = (object)array("sid" => $subscription->sid, "nid" => $node->nid, "timestamp" => $timestamp);
+		drupal_write_record("immo_subscription_stats", $stat);
+		$nodes[$node->nid] = node_load($node->nid);
+	}
+		
+	if(!count($nodes))
+		return false;
+	
+	return immobilier_subscription_send($subscription, $nodes);
+}
+
+/*
+* immobilier_subscription_process
+*/
+function immobilier_subscription_send($subscription, $nodes = array()) {
+	
+	// préparation des nodes
+	foreach($nodes as $nid => $node) {
+		$nodes[$nid]->url = url("node/".$node->nid, array("absolute" => true, "query" => array("sid" => $subscription->sid)));
+	}
+
+	//préparation du message
+	$destination = $subscription->mail;
+	$method = immobilier_subscription_variable_get("notification_method");
+	$send_method = messaging_send_method($method);
+
+	// validation du destinataire
+	if(!$send_method->address_validate($destination))
+		return false;
+	
+	// tokens
+	$tokens = $subscription->data ? (object)$subscription->data : new stdClass();
+	$tokens->count = count($nodes);
+	$tokens = array("notification" => $tokens);
+
+	// sujet
+	$subject = immobilier_subscription_variable_get("notification_subject");
+	$subject = token_replace_multiple($subject, $tokens);
+	
+	// body
+	$body = theme("immobilier_subscription_notification", $subscription, $nodes);
+	
+	$message = messaging_message_build(array(
+		'subject' => $subject,
+		'body' =>  token_replace_multiple($body, $tokens),
+		'priority' => 1
+	));
+
+	// envoi du message
+	return messaging_message_send(array($destination), $message, $method);
+}
+
+/* 
+* immobilier_subscription_to_string
+*/
+function immobilier_subscription_to_string($subscription) {
+	include_once dirname(__FILE__)."/immobilier_subscription.pages.inc";
+	if(!is_object($subscription))
+		$subscription = immobilier_subscription_load($subscription);
+		
+	// récupération du formulaire
+	$form_state = array();
+	$form = drupal_retrieve_form("immobilier_subscription_register_form", $form_state, $subscription->type);
+	drupal_prepare_form("immobilier_subscription_register_form", $form, $form_state);
+	
+	$search = is_string($subscription->search) ? unserialize($subscription->search) : $subscription->search;
+	$data = is_string($subscription->data) ? unserialize($subscription->data) : $subscription->data;
+	$params = array_filter(array_merge((array)$data, (array)$search));
+	
+	$lines = array();
+	foreach($params as $key=>$values) {
+		$field = isset($form["search"][$key]) ? $form["search"][$key] : $form[$key];
+		if(!$field) continue;
+		if(!is_array($values))
+			$values = array($values);
+		if(isset($field["#options"])) {
+			foreach($values as $k=>$v) 
+				$values[$k] = isset($field["#options"][$v]->option) ? current($field["#options"][$v]->option) : $field["#options"][$v];
+		}
+		$lines[] = sprintf("%s : %s", $field["#title"], join(", ", $values));
+	}
+	
+	return join("\r", $lines);
+}
+
+/*
+* immobilier_subscription_variable_get
+*/
+function immobilier_subscription_variable_get($key, $default=false) {
+	if(!$default) {
+		switch($key) {
+			case "notification_method":
+				$default = current(array_keys(messaging_method_list()));
+			break;
+			case "notification_subject":
+				$default = "Découvrez [count] nouvelle(s) annonce(s) sur [site-name] !";
+			break;
+		}	
+	}
+	return variable_get("immobilier_subscription_$key", $default);
+}
+
+/*
+* immobilier_subscription_variable_set
+*/
+function immobilier_subscription_variable_set($key, $value) {
+	return variable_set ("immobilier_subscription_$key", $value);
+}
+

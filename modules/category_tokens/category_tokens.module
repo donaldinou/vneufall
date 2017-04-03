@@ -1,0 +1,102 @@
+<?php
+//$Id:
+
+
+
+function category_tokens_token_values($type, $object = NULL) {
+
+  if ($type == 'node'){
+
+    $tokens = array();
+    $vocabularies = taxonomy_get_vocabularies($object->type);
+
+    foreach ($vocabularies as $vocabulary) {
+  
+      $terms = taxonomy_node_get_terms_by_vocabulary($object, $vocabulary->vid);
+      $first_term = array_shift($terms);
+      $last_term = array_pop($terms);
+      if (!$last_term){
+        $last_term = $first_term;
+      }
+  
+      if ($first_term) {
+  
+        $tokens['first-term-id-in-'._category_tokens_title_to_id($vocabulary->name)] = $first_term->tid;
+        $tokens['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name)] = _category_tokens_title_to_id($first_term->name);
+        $tokens['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-raw'] = $first_term->name;
+        $tokens['last-term-id-in-'._category_tokens_title_to_id($vocabulary->name)] = $last_term->tid;
+        $tokens['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name)] = _category_tokens_title_to_id($last_term->name);
+        $tokens['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-raw'] = $last_term->name;
+        
+        $path = array();
+        $safe_path = array();
+        $parents = taxonomy_get_parents_all($first_term->tid);
+        foreach($parents as $parent){
+          array_unshift($path, $parent->name);
+          array_unshift($safe_path, _category_tokens_title_to_id($parent->name));
+        }
+        $tokens['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path'] = implode('\\/', $safe_path);
+        $tokens['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path-raw'] = implode('\\/', $path);
+
+        $path = array();
+        $safe_path = array();
+        $parents = taxonomy_get_parents_all($last_term->tid);
+        foreach($parents as $parent){
+          array_unshift($path, $parent->name);
+          array_unshift($safe_path, _category_tokens_title_to_id($parent->name));
+        }
+        $tokens['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path'] = implode('\\/', $safe_path);
+        $tokens['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path-raw'] = implode('\\/', $path);
+        
+      }
+    }
+    return count($tokens) ? $tokens : NULL;
+  }
+
+}
+
+
+
+function category_tokens_token_list($type = 'all') {
+
+  if ($type == 'node'){
+
+    $tokens = array();
+    $vocabularies = taxonomy_get_vocabularies();
+  
+    foreach ($vocabularies as $vocabulary) {
+      $tokens['taxonomy']['first-term-id-in-'._category_tokens_title_to_id($vocabulary->name)] = t('The id of the first term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name)] = t('The name of the first term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-raw'] = t('The name of the first term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path'] = t('The name path of first term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['first-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path-raw'] = t('The name path of first term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['last-term-id-in-'._category_tokens_title_to_id($vocabulary->name)] = t('The id of the last term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name)] = t('The name of the last term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-raw'] = t('The name of the last term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path'] = t('The name path of last term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+      $tokens['taxonomy']['last-term-name-in-'._category_tokens_title_to_id($vocabulary->name).'-path-raw'] = t('The name path of last term within the !vocab vocabulary', array('!vocab' => $vocabulary->name));
+    }
+  
+    return count($tokens) ? $tokens : NULL;
+  }
+
+}
+
+
+
+/**
+ * Converts a title into an id
+ *
+ * @param string $title
+ */
+function _category_tokens_title_to_id($title){
+  return ereg_replace('[\ ]+', '-', 
+            ereg_replace('[^a-z0-9\ \-]*', '', 
+              strtolower(
+                trim(
+                  htmlspecialchars_decode($title, ENT_QUOTES)
+                )
+              )
+            )
+          );
+}

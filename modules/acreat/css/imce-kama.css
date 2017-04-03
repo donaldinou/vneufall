@@ -1,0 +1,125 @@
+
+/* Remove IMCE's log display. */
+body.imce #log-wrapper {
+  display: none;
+}
+
+body.imce #log-prv-wrapper #log-resizer.x-resizer {
+  display: none;
+}
+
+body.imce #log-clearer {
+  display: none !important;
+}
+
+/* Remove IMCE's display navigation */
+body.imce #navigation-wrapper {
+  display:none;
+}
+
+body.imce .x-resizer {
+  display: none;
+}
+body.imce .y-resizer {
+  height: 6px;
+  background-color: white;
+}
+body.imce #log-prv-wrapper {
+  border: none;
+  background-color: #EBEBEB;
+}
+body.imce #browse-wrapper {
+  border: none;
+
+}
+body.imce table#file-header td:hover,
+body.imce table#file-header td.asc,
+body.imce table#file-header td.desc {
+  cursor: pointer;
+  text-decoration: underline;
+  color: #027AC6;
+}
+body.imce table#file-header td {
+  color: #027AC6;
+}
+
+body.imce ul.secondary li {
+  border: none;
+}
+
+body.imce #file-list tr:hover,
+body.imce tr.highlight {
+  background-color: #FFFFCC;
+}
+
+body.imce tr.selected td {
+  background-color: #fffaad;
+}
+
+body.imce table#file-list {
+  border-top: 2px solid #C0C0C0;
+}
+
+body.imce table.files td {
+  border-top: 1px solid #C0C0C0;
+  border-bottom: 1px solid #C0C0C0;
+  cursor: pointer;
+}
+
+body.imce a,
+body.imce div {
+  outline:none;
+}
+
+body.imce ul.secondary li {
+  margin:0 0.4em;
+  padding: 0px;
+}
+
+body.imce #ops-wrapper {
+  background: transparent;
+  border: none;
+  margin-bottom: 20px;
+}
+
+body.imce ul#ops-list li a,
+body.imce ul#ops-list li a:hover,
+body.imce ul#ops-list li a:link,
+body.imce ul#ops-list li a:visited,
+body.imce ul#ops-list li a:active {
+  -moz-border-radius:5px;
+  -webkit-border-radius: 5px;
+  background:url("../../../libraries/ckeditor/skins/kama/images/sprites.png") repeat-x scroll 0 -1069px transparent;
+  cursor:pointer;
+  padding:5px 10px;
+  color:#000000;
+  font:12px Arial,Helvetica,Tahoma,Verdana,Sans-Serif;
+  text-align:left;
+  text-decoration:none;
+  white-space:nowrap;
+  width:auto;
+  vertical-align:baseline;
+  height:auto;
+  margin:0 15px 0 0;
+  border-collapse:collapse;
+  border:0 none;
+}
+
+body.imce ul#ops-list li#op-item-delete a,
+body.imce ul#ops-list li#op-item-delete a:hover,
+body.imce ul#ops-list li#op-item-delete a:link,
+body.imce ul#ops-list li#op-item-delete a:visited,
+body.imce ul#ops-list li#op-item-delete a:active {
+  background:url("../../../libraries/ckeditor/skins/kama/images/sprites.png") repeat-x scroll 0 -1106px transparent;
+}
+
+body.imce ul#ops-list li#op-item-sendto a:link,
+body.imce ul#ops-list li#op-item-sendto a:visited {background-position:0 -1143px;}
+
+
+body.imce ul#ops-list li a:hover,
+body.imce ul#ops-list li#op-item-sendto a:hover,
+body.imce ul#ops-list li#op-item-delete a:hover {
+  background-position:0 -1181px;
+}
+

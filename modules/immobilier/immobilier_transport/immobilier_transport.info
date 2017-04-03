@@ -1,0 +1,6 @@
+; 
+name = Transports publics
+description = Gestion des transports publics dans les annonces
+package = Immobilier
+dependencies[] = immobilier
+core = "6.x"

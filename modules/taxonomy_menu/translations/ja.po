@@ -1,0 +1,97 @@
+# $Id: ja.po,v 1.1.2.1 2008/04/14 14:16:26 imagine Exp $
+#
+# Japanese translation of Drupal (taxonomy_menu)
+# Copyright 2008 0829 <hixarg+0829@gmail.com>
+# Generated from files:
+#  taxonomy_menu.inc,v 1.1.1.1 2008/01/31 16:28:34 brmassa Exp
+#  taxonomy_menu.info,v 1.1.1.1 2008/01/31 16:28:34 brmassa Exp
+#  taxonomy_menu.module,v 1.1.1.1 2008/01/31 16:28:34 brmassa Exp
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Drupal 6.x\n"
+"POT-Creation-Date: 2008-04-13 21:28+0900\n"
+"PO-Revision-Date: 2008-04-13 22:26+0900\n"
+"Last-Translator: 0829 <hixarg+0829@gmail.com>\n"
+"Language-Team: DRUPAL*DRUPAL <hixarg+0829@gmail.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:20
+msgid "No"
+msgstr "いいえ"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:21
+msgid "Normal"
+msgstr "通常"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:48
+msgid "Module types"
+msgstr "モジュールタイプ"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:61
+msgid "Show this category in menu"
+msgstr "このカテゴリをメニューに表示"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:79
+msgid "How should be the first item on the menu? Example: categories/1/2/3, technology/1/2/3"
+msgstr "メニューの最初のアイテムに当たるパスを指定します。 下位のメニュー項目を categories/1/2/3 や technology/1/2/3 のようにしたい場合、それぞれ categories または technology と入力します。"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:80
+msgid "Module page"
+msgstr "モジュールページ"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:85
+msgid "If checked, number of node per term will be displayed in the menu."
+msgstr "カテゴリに分類されたコンテンツの数もメニュー表示したい場合はチェックしてください。"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:86
+msgid "Display number of nodes per terms"
+msgstr "カテゴリに分類されたコンテンツ数を表示"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:91
+msgid "If checked, only taxonomy terms with members will be shown in the menu."
+msgstr "分類されたコンテンツが存在しないカテゴリをメニューから非表示にしたい場合はチェックしてください。"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:92
+msgid "Hide Empty Terms"
+msgstr "空のカテゴリを非表示"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:97
+msgid "If checked, then when a term is selected all nodes belonging to subterms are also displayed."
+msgstr "カテゴリ選択時に、サブカテゴリに属するコンテンツも含めて表示したい場合はチェックしてください。"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:98
+msgid "Display descendants"
+msgstr "下位カテゴリの表示"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:104
+msgid "Save configuration"
+msgstr "設定の保存"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:143
+msgid "Global configuration of taxonomy menu functionality."
+msgstr "タクソノミーメニュー全体の機能を設定します。"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:148
+msgid "Taxonomy Menu Plus settings"
+msgstr "タクソノミーメニュー追加設定"
+
+#: modules/taxonomy_menu/taxonomy_menu.inc:310
+msgid "No content for this category."
+msgstr "このカテゴリのコンテンツはありません。"
+
+#: modules/taxonomy_menu/taxonomy_menu.info:0
+msgid "Taxonomy Menu"
+msgstr "タクソノミーメニュー"
+
+#: modules/taxonomy_menu/taxonomy_menu.info:0
+msgid "Adds links to taxonomy terms to the global navigation menu."
+msgstr "サイトのナビゲーションメニューにカテゴリのナビゲーションを追加します。"
+
+#: modules/taxonomy_menu/taxonomy_menu.module:0
+msgid "taxonomy_menu"
+msgstr "タクソノミーメニュー"
+

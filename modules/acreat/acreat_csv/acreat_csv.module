@@ -1,0 +1,37 @@
+<?php
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+ 
+/*
+* Retourne les résultat d'une requête sous forme CSV
+*/
+function db_csv($result, $delimiter = ';', $enclosure = '"', $eol = "\n", $header = true, $callback = null)
+{
+	$csv = "";
+	while($row = db_fetch_array($result)) {
+		// appel du callback le cas échéant
+		if(isset($callback)) { $callback($row); }
+		// insertion des entetes de colonnes
+		if(empty($csv) && $header) 
+			$csv .= sputcsv(array_keys($row),$delimiter,$enclosure,$eol);
+		// ajout de la ligne
+		$csv .= sputcsv($row,$delimiter,$enclosure,$eol);
+	}	
+	return $csv;
+}
+
+/*
+* sputcsv
+* Format un tableau associatif en ligne CSV
+*/
+function sputcsv($row, $delimiter = ';', $enclosure = '"', $eol = "\n")
+{
+	foreach ($row as $key=>$value) {
+		if(preg_match("/".preg_quote($enclosure)."|".preg_quote($delimiter)."|\r|\n/si", $value))
+			$row[$key] = $enclosure.str_replace($enclosure, $enclosure.$enclosure, $value).$enclosure; 
+	}
+	$csv = join($delimiter, $row).$eol;
+	return $csv;
+}

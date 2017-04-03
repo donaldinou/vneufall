@@ -1,0 +1,130 @@
+<?php
+// $Id: acreat_ubercart.module,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_menu
+ */
+function acreat_ubercart_menu() {
+	$items = array();
+	
+	// Ajout direct d'un produit au panier
+	$items['cart/add/%node'] = array(
+		'title' => 'Add to cart',
+		'description' => 'Add a product to the cart',
+		'page callback' => 'acreat_ubercart_add_node_to_cart',
+		'page arguments' => array(2),
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK
+	);
+	
+	$items['admin/store/settings/invoice'] = array(
+		'title' => 'Configuration des factures',
+		'description' => "Configuration des factures générées par Ubercart",
+		'access arguments' 	=> array('access administration pages'),
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' => array('acreat_ubercart_invoice_settings_form')
+	);
+	
+	return $items;
+}
+
+/**
+ * Implementation of hook_table_alter
+ * Hook de TAPIR 
+ * http://www.ubercart.org/docs/developer/7512/tapir_tables_api
+ */
+function acreat_ubercart_tapir_table_alter($data, $table_id) {
+	if(!module_exists("uc_vat")) 
+		return;
+
+	switch($table_id) {
+		case "op_products_customer_table":
+			$order = $data['#parameters'][1];
+			
+			$data['#columns']['prix_ht'] = array(
+				'cell' => t('Price excl. VAT'),
+				'weight' => 3
+			);
+			
+			foreach(array_keys($data['#rows']) as $key) {
+				$data['#rows'][$key]['prix_ht'] = array(
+					'#value' => uc_price($order->products[$key]->price, array('type' => 'line_item'))
+				);
+			}
+			
+		break;	
+	}
+}
+
+/**
+ * Implementation of hook_menu
+ */
+function acreat_ubercart_token_values($type, $object = NULL, $options = array()) {
+	$tokens = array();
+	if($type == "order") {
+		$tokens["order-remerciements"] = variable_get('acreat_ubercart_invoice_remerciements', t('Thanks again for shopping with us.'));	
+	}
+	return $tokens;
+}
+
+function acreat_ubercart_token_list($type = 'all') {
+	$tokens = array();
+	if ($type == 'order') {
+		$tokens['order']['order-remerciements'] = "Remerciements de commande";
+	}
+	return $tokens;
+}
+
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+
+/* --
+* acreat_ubercart_add_node_to_cart
+* Execute automatiquement le formulaire de Add to cart d'Ubercart pour le node
+*/
+function acreat_ubercart_add_node_to_cart($node) {
+	$form_id = "uc_product_add_to_cart_form_".$node->nid;
+	$form_state = array('values' => array(
+		'qty' => 1
+	));
+	drupal_execute($form_id, $form_state, $node);
+	drupal_goto("cart");
+}
+
+
+/* --
+* acreat_ubercart_invoice_settings_form
+* Formulaire de configuration des factures d'Ubercart
+*/
+function acreat_ubercart_invoice_settings_form() {
+	$form = array();
+	  
+	$form['acreat_ubercart_invoice']['acreat_ubercart_invoice_remerciements'] = array(
+		'#type' => 'textarea',
+		'#title' => t('Remerciements'),
+		'#description' => 'Phrase de remerciements dans la facture',
+		'#default_value' => variable_get('acreat_ubercart_invoice_remerciements', t('Thanks again for shopping with us.')),
+	);
+	
+	$form['acreat_ubercart_invoice']['acreat_ubercart_invoice_conditions_reglement'] = array(
+		'#type' => 'textarea',
+		'#title' => t('Conditions de règlement'),
+		'#description' => 'Les conditions de règlement figurent sur votre facture, sous la liste des produits commandés.',
+		'#default_value' => variable_get('acreat_ubercart_invoice_conditions_reglement', 'Saisissez ici les conditions de règlement qui figureront sous la liste des produits,  sur votre facture.'),
+	);
+	
+	$form['acreat_ubercart_invoice']['acreat_ubercart_invoice_designation_societe'] = array(
+		'#type' => 'textarea',
+		'#title' => t('Désignation de la société'),
+		'#description' => 'La désignation de votre société figure tout en bas de votre facture.',
+		'#default_value' => variable_get('acreat_ubercart_invoice_designation_societe', 'Saisissez ici la désignation de votre société...'),
+	);
+	
+	return system_settings_form($form);
+}

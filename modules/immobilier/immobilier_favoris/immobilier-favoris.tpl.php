@@ -1,0 +1,1 @@
+<?php print theme("immobilier_search", $nodes, $search); ?>

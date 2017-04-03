@@ -1,0 +1,6 @@
+; 
+name = Immobilier
+description = Gestion d'un site immobilier par Acreat
+package = Immobilier
+dependencies[] = acreat
+core = "6.x"

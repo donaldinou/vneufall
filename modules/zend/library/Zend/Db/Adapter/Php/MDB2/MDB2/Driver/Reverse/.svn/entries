@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="3"
+   name=""
+   committed-date="2007-01-19T05:38:29.668773Z"
+   url="svn://agoraproduction.com:3343/srv/www/htdocs/web14/files/zend_db/Php/MDB2/MDB2/Driver/Reverse"
+   last-author="david"
+   kind="dir"
+   uuid="4ce37cf7-5d27-0410-aafa-bac4ba9a4159"
+   revision="29"/>
+<entry
+   committed-rev="3"
+   name="mssql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="055a516bf0f3aef7334f255d2cced5c2"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="sqlite.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="1157ae8a0e0e600f75b5c826baf4c542"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="oci8.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="9f385b7e5d9b05a5d019f4f20ecb746c"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="mysql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="55709880ca662c165c551b2c472a2c9b"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="pgsql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="4d5e8471f30f2941ee4fe605731cf9d0"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="Common.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="68f0a82e87a6e626fa71e39319b7dff8"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+</wc-entries>

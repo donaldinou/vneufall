@@ -1,0 +1,50 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * hook_nodeapi() 
+ * Define menu items and page callbacks.
+ */
+function acreat_private_node_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+	switch($op) {
+		case "view":
+			// protection des nodes privés
+			if($node->private && !user_access('access private node')) {
+				drupal_access_denied();
+				exit;
+			}
+		break;
+	}
+}
+
+function acreat_private_node_perm() {
+	return array('access private node');
+}
+
+/**
+ * hook_schema_alter() 
+ */
+function acreat_private_node_schema_alter(&$schema) {
+	$schema["node"]["fields"]["private"] = array(
+		'description' => 'Booléen indiquant si la page doit être réservée aux visiteurs identifiés',
+		'type' => 'int',
+		'not null' => 1,
+		'default' => 0
+	);
+}
+
+/**
+ * hook_form_alter() 
+ */
+function acreat_private_node_form_alter(&$form, $form_state, $form_id) {
+	if(preg_match("/_node_form$/", $form_id) && $form["options"]) {
+		$form["options"]["private"] = array(
+			'#type' => 'checkbox',
+			'#title' => "Limiter l'accès à cette page aux visiteurs identifiés",
+			'#default_value' => $form["#node"]->private
+		);
+	}
+}

@@ -1,0 +1,6 @@
+; $Id$
+name = Acreat
+description = Module de base Acreat Web Technologies
+package = Acreat
+core = 6.x
+version = 6.x-1.0

@@ -1,0 +1,385 @@
+<?php
+// $Id: taxonomy_menu_hierarchy.module,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+
+/*******************************************************************************
+ * HOOKS
+ ******************************************************************************/
+ 
+
+/**
+ * Implementation de hook_menu().
+ */
+function acreat_atos_menu() {
+	$items = array();
+	
+	$items['admin/settings/atos'] = array(
+		'title' => 'Acreat Atos/SIPS',
+		'description' => "Configuration de l'interface de paiement Atos/SIPS",
+		'access arguments' 	=> array('access administration pages'),
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' => array('acreat_atos_settings_form')
+	);
+	
+	return $items;
+}
+
+/*******************************************************************************
+ * PAGES / CALLBACKS
+ ******************************************************************************/
+
+function acreat_atos_settings_form() {
+	
+	$form = array();
+	
+	$form['acreat_atos_bank'] = array(
+		'#type' => 'select',
+		'#title' => 'Bank',
+		'#options' => array(
+		  'etransaction' => t('Credit agricole (E-transaction)'),
+		  'sogenactif' => t('Societe generale (Sogenactif)'),
+		  'cyberplus' => t('Banque populaire (Cyberplus)'),
+		  'mercanet' => t('BNP Paribas (Mercanet)'),
+		  'scellius' => t('La poste (Scellius)'),
+		  'sherlocks' => t('LCL : Le Credit Lyonnais (Sherlocks)'),
+		  'webaffaires' => t('Crédit du Nord (Webaffaires)'),
+		),
+		'#default_value' => variable_get('acreat_atos_bank', 'mercanet')
+	);
+	  
+	$form['acreat_atos_mid'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Merchant ID'),
+		'#description' => t('Your atos merchant ID. If you don\'t fill this field, the "demo mode number" will be used.'),
+		'#default_value' => acreat_atos_get_mid(),
+		'#size' => 32
+	);
+	
+	$form['acreat_atos_language'] = array(
+        '#type' => 'select',
+        '#title' => t('Language preference'),
+        '#description' => t('Adjust language on atos pages. If you have a multilanguage website, the language selected by user will overwrite this setting'),
+        '#options' => array(
+          'en' => t('English'),
+          'fr' => t('French'),
+          'ge' => t('Germany'),
+          'sp' => t('Spain'),
+          'it' => t('Italia'),
+        ),
+        '#default_value' => variable_get('acreat_atos_language', 'fr'),
+     );  
+	
+	// --- CONFIGURATION DE L'API
+	
+	$form['acreat_atos_api'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('API Configuration'),
+		'#description' => t('Please enter here the informations needing by the ATOS/SIPS binaries.')
+		  . '<br />' . t('If something does not work as expected, you might wish to enter those settings in the param file :')
+		  . '<ul>'
+		  . '<li>RETURN_URL!' . url('cart/atos/complete', array('absolute' => TRUE)) . '!</li>'
+		  . '<li>CANCEL_URL!' . url('cart/atos/cancel', array('absolute' => TRUE)) . '!</li>'
+		  . '<li>AUTO_RESPONSE_URL!' . url('cart/atos/autoresponse', array('absolute' => TRUE)) . '!</li>'
+		  . '</ul>'
+		  . t('Please note that any values pre-entered here are just common defaults, not autodetected values. Adjust to your configuration.').'<br />'
+		  . t('Don\'t forget to configure your pathfile file. On windows system you will have to put double backslashes in your pathfile path. (example : F_PARAM!c:\\\\drupal\\\\atos\\\\param\\\\parmcom!)'),        
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	
+	$form['acreat_atos_api']['acreat_atos_api_version'] = array(
+		'#type' => 'select',
+		'#title' => t('API Version'),
+		'#options' => array(
+		  'LIN_500' => t('Linux v5'),
+		  'WIN_500' => t('Win32 v5'),
+		  'LIN_600' => t('Linux v6'),
+		  'WIN_600' => t('Win32 v6'),
+		  ),
+		'#default_value' => variable_get('acreat_atos_api_version', 'LIN_600'),
+		'#description' => t("Please choose the version of the API provided by your bank."),
+		'#required' => TRUE,
+	);
+
+	$form['acreat_atos_api']['acreat_atos_api_pathfile'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_api_pathfile', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/param/pathfile'),
+		'#title' => t('Path to "pathfile"'),
+		'#description' => t("Full server-side path to the \"pathfile\" configuration file. On Windows platform, double the backslashes (example : c:\\\\www\\\\drupal\\\\atos\\\\param\\\\pathfile)"),
+		'#size' => 100,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);
+	
+	$form['acreat_atos_api']['acreat_atos_api_pathrequest'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_api_pathrequest', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/bin/request'),
+		'#title' => t('Path to the "request" executable'),
+		'#description' => t("Full server-side path to the request binary file. On Windows platform, double the backslashes (example : c:\\\\www\\\\drupal\\\\atos\\\\bin\\\\request.exe)"),
+		'#size' => 100,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);
+	
+	$form['acreat_atos_api']['acreat_atos_api_pathresponse'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_api_pathresponse', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/bin/response'),
+		'#title' => t('Path to the "response" executable'),
+		'#description' => t("Full server-side path to the response binary file. On Windows platform, double the backslashes (example : c:\\www\\\\drupal\\\\atos\\\\bin\\\\response.exe)"),
+		'#size' => 100,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);		
+	
+	// --- CONFIGURATION DES REPONSES
+	$form['acreat_atos_call'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Call URL'),		
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	
+	$form['acreat_atos_call']['acreat_atos_call_complete'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_call_complete', 'atos/complete'),
+		'#title' => t('Complete URL'),
+		'#size' => 60,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);
+	
+	$form['acreat_atos_call']['acreat_atos_call_cancel'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_call_cancel', 'atos/cancel'),
+		'#title' => t('Cancel URL'),
+		'#size' => 60,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);
+	
+	$form['acreat_atos_call']['acreat_atos_call_auto'] = array(
+		'#type' => 'textfield',
+		'#default_value' => variable_get('acreat_atos_call_auto', 'atos/autoresponse'),
+		'#title' => t('Autoresponse URL'),
+		'#size' => 60,
+		'#maxlength' => 256,
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+ 
+ 
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+
+/* --
+* acreat_atos_checkout_form
+* Génération du formulaire de checkout d'ATOS
+*/
+function acreat_atos_checkout_form($options = false) {
+	global $user;
+	
+	$merchant_id = acreat_atos_get_mid();
+	$pathfile = variable_get('acreat_atos_api_pathfile', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/param/pathfile');
+	$language = $GLOBALS['locale'] ? $GLOBALS['locale'] : 'fr';
+
+	$params = array(
+		'merchant_id' 		=> $merchant_id,
+		'merchant_country'	=> variable_get('acreat_atos_language', 'fr'),
+		'currency_code'		=> 978,
+		'pathfile'			=> $pathfile,
+		'customer_id'		=> $user->uid,
+		'customer_email'	=> $user->mail,
+		'language'			=> $language,
+		'caddie'			=> false,
+		'normal_return_url'	=> url(variable_get('acreat_atos_call_complete', 'atos/complete'), array('absolute' => TRUE)),
+		'cancel_return_url'	=> url(variable_get('acreat_atos_call_cancel', 'atos/cancel'), array('absolute' => TRUE)),
+		'automatic_response_url' => url(variable_get('acreat_atos_call_auto', 'atos/autoresponse'), array('absolute' => TRUE))
+	);
+	if($options) { 
+		$params = array_merge($params, $options); 
+	}
+	
+	$params["caddie"] = acreat_atos_encode_caddie($params["caddie"]);
+	
+	foreach($params as $key=>$value) 
+		$params[$key] = "$key=$value";
+	$parm = join(" ", $params);
+
+	$path_bin = variable_get('acreat_atos_api_pathrequest', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/bin/request');
+	$result=stripslashes(exec("$path_bin $parm"));
+	$hash = explode ("!", "$result");
+
+	$code = $hash[1];
+	$error = $hash[2];
+	$message = $hash[3];
+
+	//  Analyse of return code
+	if (( $code == "" ) && ( $error == "" )) {
+		drupal_set_message(t('Request call error : Request executable file not found'), 'error');
+	}
+	//	Erreur, display the error message
+	else if ($code != 0){
+		drupal_set_message(t('Payment API call error'), 'error');
+		return $error;
+	}
+	//	OK, display the form
+	else {
+	// If debug = YES, show the parameters
+		drupal_set_message($error);
+		return $message;
+	}
+}
+
+/* --
+* acreat_atos_response_extract
+* Récupération des données de réponse d'ATOS
+*/
+function acreat_atos_response_extract($message) {
+
+	$params = array(
+      'pathfile' => variable_get('acreat_atos_api_pathfile', $_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/param/pathfile'),
+      'message' => $message,
+    );
+	
+	$launcher = variable_get('acreat_atos_api_pathresponse', $$_SERVER['DOCUMENT_ROOT'].base_path().conf_path().'/atos/bin/response');
+	foreach($params as $key => $value) {
+		$launcher .= ( empty($params[$key]) ? '' : ' ' . escapeshellarg($key . '=' . $value));
+	}
+
+	$result=stripslashes(exec($launcher));
+	
+	//We parse the result
+	$tmp = explode('!', $result);
+	
+	$i = 1;
+	$output = array(
+		'code' => $tmp[$i++],
+		'error' => $tmp[$i++],
+		'merchant_id' => $tmp[$i++],
+		'merchant_country' => $tmp[$i++],
+		'amount' => $tmp[$i++],
+		'transaction_id' => $tmp[$i++],
+		'payment_means' => $tmp[$i++],
+		'transmission_date' => $tmp[$i++],
+		'payment_time' => $tmp[$i++],
+		'payment_date' => $tmp[$i++],
+		'response_code' => $tmp[$i++],
+		'payment_certificate' => $tmp[$i++],
+		'authorisation_id' => $tmp[$i++],
+		'currency_code' => $tmp[$i++],
+		'card_number' => $tmp[$i++],
+		'cvv_flag' => $tmp[$i++],
+		'cvv_response_code' => $tmp[$i++],
+		'bank_response_code' => $tmp[$i++],
+		'complementary_code' => $tmp[$i++],
+		'complementary_info' => ( substr(variable_get('acreat_atos_api_version', 'LIN_600'), 0 -3) == '500' ? NULL : $tmp[$i++] ),
+		'return_context' => $tmp[$i++],
+		'caddie' => $tmp[$i++],
+		'receipt_complement' => $tmp[$i++],
+		'merchant_language' => $tmp[$i++],
+		'language' => $tmp[$i++],
+		'customer_id' => $tmp[$i++],
+		'order_id' => $tmp[$i++],
+		'customer_email' => $tmp[$i++],
+		'customer_ip_address' => $tmp[$i++],
+		'capture_day' => $tmp[$i++],
+		'capture_mode' => $tmp[$i++],
+		'data' => $tmp[$i++],
+	);
+
+	$output["caddie"] = acreat_atos_decode_caddie($output["caddie"]);	
+	return $output;
+}
+
+
+/**
+* acreat_atos_response_complete
+ * Extrait et analyse la réponse de completion du serveur ATOS
+ *
+ */
+function acreat_atos_response_complete($autoresponse) {
+	if (empty($_POST['DATA'])) {
+		watchdog('acreat_atos', t("The 'autoresponse' function was called without any POST data."), WATCHDOG_WARNING, NULL);
+		drupal_set_error("We didn't receive data from the bank.");
+		return false;
+	}
+
+	//Extraction of the data
+	$response = acreat_atos_response_extract($_POST['DATA']);
+	if ( ! ( isset($response['code'])
+		  and $response['code'] == 0
+		  and isset($response['order_id'])
+		  and is_numeric($response['order_id'])
+		  and isset($response['response_code'])
+		  )) {
+		watchdog('acreat_atos', t('API ATOS/SIPS error : ') . ( isset($response['error']) ? strip_tags($response['error']) : '[no message]'));
+		drupal_set_error("ATOS/SIPS error : Error during order data analyze. Please, try again or contact administrator.");
+		return false;
+	}
+
+	//We check that the bank accepted the payment
+	if ($response['response_code'] != '00') {
+		//Payment refused
+		watchdog('acreat_atos', t("The transaction wasn't authorized."), WATCHDOG_NOTICE, NULL);
+		drupal_set_error("The transaction wasn't authorised by the bank...");
+		return false;
+	}
+	
+	return $response;
+}
+
+
+/**
+ * Get the merchant ID. If empty, return a demo ID.
+ *
+ * if arg(1) is true, the function just test if we are in
+ * "demo-mode"
+ */
+function acreat_atos_get_mid($test = FALSE) {
+  $mid = variable_get('acreat_atos_mid', '');
+  $banks_mid = array(
+    'etransaction' => '013044876511111',
+    'sogenactif' => '014213245611111',
+    'cyberplus' => '038862749811111',
+    'mercanet' => '082584341411111',
+    'scellius' => '014141675911111',
+    'sherlocks' => '014295303911111',
+    'webaffaires' => '014022286611111',
+  );
+
+  if (!empty($mid)) {
+    //If $test is TRUE, we just check whether we are in demo mode
+    if ($test) {
+      return in_array($mid, $banks_mid);
+    }
+    return $mid;
+  } else {
+    //If $test is TRUE, well, we are in demo mode...
+    if ($test) {
+      return TRUE;
+    }
+
+    if (isset($banks_mid[variable_get('acreat_atos_bank', '')])) {
+      return $banks_mid[variable_get('acreat_atos_bank', '')];
+    }
+    else {
+      //No bank by default, hence the output is empty if no bank is configured
+      return;
+    }
+  }
+}
+
+/**
+ * Encodage du caddie
+ */
+function acreat_atos_encode_caddie($caddie) {
+	return base64_encode(serialize($caddie));
+}
+
+/**
+ * Decodage du caddie
+ */
+function acreat_atos_decode_caddie($caddie) {
+	return unserialize(base64_decode($caddie));
+}

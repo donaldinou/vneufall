@@ -1,0 +1,9 @@
+TAXONOMY MENU
+=============
+
+1. Upgrading from 6.1 => 6.2
+2. Disable the module at admin/build/modules
+3. Uninstall the module at admin/build/modules/uninstall
+4. Copy new version to sites/all/modules/taxonomy_menu
+5. Enable the new version at admin/build/modules
+See README.TXT for configuration options.

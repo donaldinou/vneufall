@@ -1,0 +1,487 @@
+<?php
+// $Id: geositemap.module,v 1.0 2009/09/08 11:30:00$
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation de hook_init
+ */
+function geositemap_init() {
+	// Add the CSS for this module.
+	//drupal_add_css(drupal_get_path('module', 'immobilier') .'/immobilier.css', 'module');
+}
+
+/**
+ * Implementation de hook_menu
+ */
+function geositemap_menu() {
+	$items = array();
+	
+	// accueil / FRANCE
+	$items['geositemap'] = array(
+		'title' 			=> 'Geositemap',
+		'type'				=> MENU_CALLBACK,
+		'page callback' 	=> 'geositemap_front',
+		'access arguments' 	=> array('access content'),
+		'file'				=> 'geositemap.pages.inc'
+	);
+	
+	// departement
+	$items['geositemap/%geositemap_departement'] = array(
+		'title' 			=> 'Geositemap département',
+		'type'				=> MENU_CALLBACK,
+		'title callback' 	=> 'geositemap_departement_title',
+		'title arguments' 	=> array(1),
+		'page callback' 	=> 'geositemap_departement',
+		'page arguments' 	=> array(1),
+		'access arguments' 	=> array('access content'),
+		'file'				=> 'geositemap.pages.inc'
+	);
+	
+	// departement
+	$items['geositemap/%geositemap_departement/index/%'] = array(
+		'title' 			=> 'Geositemap département',
+		'type'				=> MENU_CALLBACK,
+		'title callback' 	=> 'geositemap_departement_title',
+		'title arguments' 	=> array(1),
+		'page callback'		=> 'geositemap_departement',
+		'page arguments' 	=> array(1,3),
+		'access arguments' 	=> array('access content'),
+		'file'				=> 'geositemap.pages.inc'
+	);
+	
+	// ville
+	$items['geositemap/%/%geositemap_ville'] = array(
+		'title' 			=> 'Geositemap ville',
+		'type'				=> MENU_CALLBACK,
+		'title callback'	=> 'geositemap_ville_title',
+		'title arguments' 	=> array(2),
+		'page callback' 	=> 'geositemap_ville',
+		'page arguments' 	=> array(2),
+		'load arguments' 	=> array(1),
+		'access arguments' 	=> array('access content'),
+		'file'				=> 'geositemap.pages.inc'
+	);
+	
+	// ADMINISTRATION
+	$items['admin/settings/geositemap'] = array(
+		'title' 			=> 'Geositemap',
+		'description' 		=> 'Configuration des variables du Geositemap',
+		'access arguments' 	=> array('access administration pages'),
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' 	=> array('geositemap_admin_settings_form'),
+		'file' 				=> 'geositemap.admin.inc'
+	);
+	
+	return $items;
+}
+
+/**
+ * Implementation de hook_theme
+ */
+function geositemap_theme() {
+	return array(
+		'geositemap' => array(
+		  'arguments' => array("villes" => array(), "departements" => array()),
+		  'template' => 'geositemap'
+		),
+		'geositemap_departement' => array(
+		  'arguments' => array("departement" => null, "top_villes" => array(), "villes" => array(), "lettres" => array()),
+		  'template' => 'geositemap-departement'
+		),
+		'geositemap_ville' => array(
+		  'arguments' => array("ville" => null, "arrondissements" => array()),
+		  'template' => 'geositemap-ville'
+		)
+	);
+}
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+ 
+/**
+* geositemap_preprocess_page
+* @see template_preprocess_page
+*/
+function geositemap_preprocess_page(&$variables) {
+	// balise <title>
+	if($head_title = geositemap_get_global("head_title")) 
+		$variables["head_title"] = $head_title;
+		
+	// objet de token
+	if($token = geositemap_get_global("token")) {
+		foreach(array("head_title","head","title","content","breadcrumb") as $key) 
+			$variables[$key] = geositemap_process_token($variables[$key], $token);
+	}
+}
+
+/*******************************************************************************
+ * FORMULAIRES
+ ******************************************************************************/
+
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+ 
+/* ---
+* geositemap_departement_load 
+*/	
+function geositemap_departement_load($dpt) {
+	static $departements;
+	
+	if(isset($departements[$dpt]))
+		return $departements[$dpt];
+	
+	$sql = geositemap_sql_departement($dpt);
+	$rs = db_query($sql);
+	$departement = db_fetch_object($rs);
+	geositemap_prepare_object(&$departement);
+	
+	$departements[$dpt] = $departement;
+	return $departement;
+}
+
+/* ---
+* geositemap_departement_title
+*/	
+function geositemap_departement_title($departement) {
+	$title = geositemap_variable_get("departement_title");
+	$title = geositemap_process_token($title, $departement);
+	return $title;
+}
+
+/* ---
+* geositemap_ville_load 
+*/	
+function geositemap_ville_load($ville, $dpt = false) {
+	static $villes;
+	
+	if(isset($villes[$dpt][$ville]))
+		return $villes[$dpt][$ville];
+		
+	$sql = geositemap_sql_ville($ville, $dpt, false,1);
+	$rs = db_query($sql);
+	$_ville = db_fetch_object($rs);
+	geositemap_prepare_object(&$_ville);
+	
+	$villes[$dpt][$ville] = $_ville;
+	return $_ville;
+}
+
+/* ---
+* geositemap_ville_title
+*/	
+function geositemap_ville_title($ville) {
+	$title = geositemap_variable_get("ville_title");
+	$title = geositemap_process_token($title, $ville);
+	return $title;
+}
+
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+ 
+/* ---
+* geositemap_process_token 
+*/	
+function geositemap_process_token($content, $object, $type = false) {
+	$content = preg_replace("/#(\w*)(?:,(\w*))?#/esi", "geositemap_preposition('$1', \$object, '$2' ? '$2' : '$type')", $content);
+	$content = preg_replace("/\{(\w+)\}/esi", "\$object->$1", $content);
+	return $content;
+}
+ 
+/* ---
+* geositemap_sql_ville 
+*/	
+function geositemap_sql_ville($ville = false, $dpt = false, $reg = false, $limit = 30, $order = "nom ASC", $where = false, $join = false) {
+	
+	// arguments
+	$where = $where ? (array)$where : array();
+	if($ville) 	
+		$where[] = geositemap_sql_ville_where($ville);
+	if($dpt) 
+		$where[] = geositemap_sql_departement_where($dpt);
+	if($reg) 	
+		$where[] = geositemap_sql_region_where($reg);
+
+	// $this->_apply_limits(&$sql, $this->limits);
+	$sql = "
+		SELECT 
+			commune.*,
+			TRIM(CONCAT(article,' ',nom)) as article_nom,
+			departement.*
+		FROM geositemap_commune as commune
+		LEFT JOIN geositemap_departement as departement ON departement.codeDepartement = commune.codeDepartement
+		$join
+		".($where ? " WHERE ".join(" AND ", $where) : false)."
+		".($order ? " ORDER BY $order" : false)."
+		".($limit ? " LIMIT $limit" : false)."
+	";
+	
+	return $sql;
+}
+
+/* ---
+* geositemap_sql_ville_where 
+*/	
+function geositemap_sql_ville_where($ville) {
+	if(preg_match("/[0-9,A,B]{5}/",$ville))
+		return sprintf("commune.codeInsee = '%s'", db_escape_string($ville));
+	else
+		return sprintf("CONCAT(REPLACE(article, '\'', ''),search_nom) = '%s'", db_escape_string(preg_replace("/[^a-z,A-Z,0-9]/si", "", $ville)));
+}
+
+/* ---
+* geositemap_sql_departement
+*/	
+function geositemap_sql_departement($dpt = false, $reg = false, $order = "nomDepartement ASC", $where = false, $join = false) {
+	
+	// arguments
+	$where = $where ? (array)$where : array();
+	if($dpt) 
+		$where[] = geositemap_sql_departement_where($dpt);
+	if($reg) 	
+		$where[] = geositemap_sql_region_where($reg);
+		
+	$sql = "
+		SELECT 
+			departement.*,
+			region.*
+		FROM geositemap_departement as departement
+		LEFT JOIN geositemap_region as region ON region.codeRegion = departement.codeRegion
+		$join
+		".($where ? " WHERE ".join(" AND ", $where) : false)."
+		".($order ? " ORDER BY $order" : false)."
+	";
+	
+	return $sql;
+}
+	
+/* ---
+* geositemap_sql_departement_where 
+*/	
+function geositemap_sql_departement_where($dpt) {
+	if(preg_match("/[0-9,A,B]{2,3}/",$dpt))
+		return sprintf("departement.codeDepartement = %d", $dpt);
+	else
+		return sprintf("departement.searchNomDepartement LIKE REPLACE('%s','".geositemap_variable_get("url_space_separator")."','%%')", db_escape_string($dpt));
+}
+	
+/* ---
+* geositemap_prepare_object 
+*/	
+function geositemap_prepare_object(&$obj) {
+	if($parts = geositemap_link_parts($obj)) {
+		$obj->link_text = $parts[0];
+		$obj->link_path = $parts[1];
+		$obj->link 		= call_user_func_array("l", $parts);
+	}
+}
+
+/* ---
+* geositemap_link 
+*/
+function geositemap_link_parts($infos, $type = false) {
+
+	if(!$type) {
+		if(isset($infos->codeInsee))
+			$type = "ville";
+		elseif(isset($infos->codeDepartement))	
+			$type = "departement";
+		else
+			return false;
+	}
+		
+	// Texte
+	$text = geositemap_variable_get($type."_link_text");
+	$text = geositemap_process_token($text, $infos, $type);
+
+	// Path
+	if($type == "ville" && $infos->codeInsee == 75056) $type = "departement"; // si Paris, on force l'url de département pour la ville
+	$path = geositemap_variable_get($type."_link_path");
+	$path = preg_replace("/\{(\w+)\}/esi", "strtourl(\$infos->$1, geositemap_variable_get('url_space_separator'))", $path);
+	
+	return array($text, $path);
+}
+
+/* ---
+* geositemap_link 
+*/
+function geositemap_l($infos, $type = false, $attributes=array()) {
+	$parts = geositemap_link_parts($infos, $type);
+	return l($parts[0], $parts[1], array("attributes" => $attributes));
+}
+
+/* ---
+* geositemap_variable_get 
+*/
+function geositemap_variable_get($name, $default = false) {
+	switch($name) {
+		case "title":					$default = "Notre activité en France"; break;
+		case "head_title":				$default = geositemap_variable_get("title"); break;
+		case "meta_description":		$default = "Notre société est présente en France"; break;
+		case "url_space_separator": 	$default = "-"; break;	
+		// ville
+		case "ville_title": 			$default = "Notre activité #a#"; break;	
+		case "ville_head_title": 		$default = geositemap_variable_get("ville_title"); break;
+		case "ville_meta_description":	$default = "Notre société est présente #a,ville# dans de département #de,departement#"; break;
+		case "ville_link_text": 		$default = geositemap_variable_get("ville_title"); break;	
+		case "ville_link_path": 		$default = "geositemap/{nomDepartement}/{article_nom}"; break;	
+		// departement
+		case "departement_title": 			$default = "Notre activité dans #le#"; break;	
+		case "departement_head_title": 		$default = geositemap_variable_get("departement_title"); break;
+		case "departement_meta_description":$default = "Notre société est présente dans le département #de,departement#"; break;
+		case "departement_link_text": 		$default = geositemap_variable_get("departement_title"); break;	
+		case "departement_link_path": 		$default = "geositemap/{nomDepartement}"; break;	
+	}
+	return variable_get("geositemap_$name", $default);
+}
+
+
+/* ---
+* geositemap_preposition 
+*/	
+function geositemap_preposition($type, $typeNomClair, $forceType=false) {
+	$label = false;
+
+	// ville
+	if( $forceType == "ville" || (!$forceType && is_object($typeNomClair) && isset($typeNomClair->codeInsee)) ) { 
+		$label = $typeNomClair->nom;
+		$typeNomClair = $typeNomClair->typeNomClair;
+	}
+	
+	// departement
+	if( $forceType == "departement" || (!$forceType && is_object($typeNomClair) && isset($typeNomClair->codeDepartement)) ) { 
+		$label = $typeNomClair->nomDepartement;
+		$typeNomClair = $typeNomClair->typeNomClairDepartement;
+	}
+
+	// region
+	if( $forceType == "region" || (!$forceType && is_object($typeNomClair) && isset($typeNomClair->codeRegion)) ) { 
+		$label = $typeNomClair->nomRegion;
+		$typeNomClair = $typeNomClair->typeNomClairRegion;
+	}
+	
+	if(!$type) return $label;
+	
+	switch($typeNomClair) {
+		case 0:	//0  	pas d'article et le nom commence par une consonne sauf H muet.  charnière = DE
+			$le = "";
+			$de = "de";
+			$a = "à";
+		break;
+		case 1:	//1 	pas d'article et le nom commence par une voyelle ou un H muet. 	charnière = D'
+			$le = "l'";
+			$de = "d'";
+			$a = "à";
+		break;
+		case 2:	//2 	article = LE 	charnière = DU
+			$le = "le";
+			$de = "du";
+			$a = "au";
+		break;
+		case 3:	//3 	article = LA 	charnière = DE LA
+			$le = "la";
+			$de = "de la";
+			$a = "à la";
+		break;
+		case 4:	//4 	article = LES 	charnière = DES
+			$le = "les";
+			$de = "des";
+			$a = "aux";
+		break;
+		case 5:	//5 	article = L' 	charnière = DE L'
+			$le = "l'";
+			$de = "de l'";
+			$a = "à l'";
+		break;
+		case 6:	//6 	article = AUX 	charnière = DES
+			$le = "aux";
+			$de = "des";
+			$a = "aux";
+		break;
+		case 7:	//7 	article = LAS charnière = DE LAS
+			$le = "las";
+			$de = "de las";
+			$a = "à las";
+		break;
+		case 8:	//8 	article = LOS 	charnière = DE LOS
+			$le = "los";
+			$de = "de los";
+			$a = "à los";
+		break;
+	}
+	
+	$prefixe = $$type;
+	return $prefixe.($label ? (substr($prefixe, -1) == "'" ? "" : " ").$label : "");
+}
+
+/* 
+* geositemap_random_text
+*/
+function geositemap_random_text($var, $lines=1, $nbparagraph=0) {
+	
+	$source = geositemap_variable_get("random_text_$var");
+	if(!$source) return false;
+	
+	// srand
+	// le texte change tous les X jours
+	$srand = preg_replace("/[^\d]/","",md5(date("Ym").ceil(date("d")/geositemap_variable_get("random_days", 15)).serialize($_GET["q"])));
+	$srand = array_sum(str_split($srand));
+	srand($srand);
+
+	$sentences = explode("\n", $source);
+	shuffle($sentences);
+	$sentences = array_slice($sentences, 0, $lines);	
+	
+	foreach($sentences as $key=>$sentence) {
+		$sentences[$key] = preg_replace_callback("/\(\?:([^\)]*)\)/si", create_function(
+			'$matches',
+			'$cases = explode(",", $matches[1]); return $cases[array_rand($cases,1)];'
+		), $sentence);
+	}	
+	
+	if(!$nbparagraph) 		
+		return join(" ", $sentences);
+		
+	$paragraphes = array();
+	$nbsentences = ceil(count($sentences)/$nbparagraph);
+	while(count($sentences)) 
+		$paragraphes[] = join(" ", array_splice($sentences, 0, $nbsentences));
+	
+	return "<p>".join("</p><p>", $paragraphes)."</p>";
+}
+
+/* 
+* geositemap_set_global
+* Enregistre une valeur globalement
+*/
+function geositemap_set_global($key, $value) {
+	$GLOBALS["geositemap"][$key] = $value;
+}
+
+/* 
+* geositemap_get_global
+* Récupère une valeur globale
+*/
+function geositemap_get_global($key) {
+	return isset($GLOBALS["geositemap"][$key]) ? $GLOBALS["geositemap"][$key] : false;
+}
+
+/* 
+* geositemap_set_meta
+* Définit une balise META pour la page en cours
+*/
+function geositemap_set_meta($name, $content) {
+	drupal_set_html_head('<meta name="'. $name .'" content="'. $content .'" />');
+}
+
+
+	
+	

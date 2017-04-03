@@ -1,0 +1,10 @@
+; $Id: acreat_taxonomy_menu_mid.info,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+core          = "6.x"
+dependencies[] = acreat
+description   = "Gestion de paiements sécurisés via l'API SIPS d'Atos"
+name          = "Interface de paiement Atos/SIPS - Acreat"
+package       = Acreat
+
+; Information added by drupal.org packaging script on 2009-03-14
+version = "6.x-2.0"
+core = "6.x"

@@ -1,0 +1,8 @@
+; $Id: acreat_automenu.info,v 1.2.2.1 2008/10/10 14:40:11 danielfs Exp $
+name = Acreat AutoMenu
+description = "Choisit automatiquement un menu parent pour chaque node"
+dependencies[] = acreat
+dependencies[] = menu
+package = Acreat
+core = 6.x
+

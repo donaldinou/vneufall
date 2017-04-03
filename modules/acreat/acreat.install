@@ -1,0 +1,21 @@
+<?php
+// $Id: acreat.install,v 1.24.2.5 2008/12/14 06:25:21 dww Exp $
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_install()
+ */
+function acreat_install() {
+	// s'assurer que les hooks d'abonnement seront les derniers pris en compte
+	db_query("UPDATE {system} SET weight = %d WHERE type = 'module' AND name = '%s'", 99, 'acreat');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function acreat_uninstall() {  
+
+}

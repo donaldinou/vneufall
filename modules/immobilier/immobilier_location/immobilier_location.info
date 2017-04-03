@@ -1,0 +1,6 @@
+; 
+name = Location
+description = Gestion des annonces de location
+package = Immobilier
+dependencies[] = immobilier
+core = "6.x"

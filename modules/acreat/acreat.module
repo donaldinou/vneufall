@@ -1,0 +1,917 @@
+<?php
+include_once(dirname(__FILE__)."/acreat.zend.inc");
+include_once dirname(__FILE__)."/GlobalFunctions.php";
+
+set_include_path(get_include_path() . PATH_SEPARATOR . dirname(__FILE__)."/libs");
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+ 
+/* ---
+* Implementation de hook_init
+*/
+function acreat_init() {
+	// variable de flush de cache
+	if(variable_get('flush_all_caches', 0) == 1) {
+		drupal_flush_all_caches();
+		variable_del('flush_all_caches');
+	}
+	
+	if(variable_get("acreat_disable_global_css", 0) == 0)
+		drupal_add_css(drupal_get_path("module", "acreat")."/css/global.css");
+	
+	// mise en variable globale de la véritable requête avant changements éventuels
+	$GLOBALS["q"] = $_GET["q"];
+	
+	// theme d'administration pour résultats webform
+	if (variable_get('node_admin_theme', '0') && arg(0) == 'node' && in_array(arg(2), array('webform-results', 'track', 'activity', 'submission'))) {
+		global $custom_theme;
+		$custom_theme = variable_get('admin_theme', '0');
+		drupal_add_css(drupal_get_path('module', 'system') .'/admin.css', 'module');
+	}
+} 
+
+ 
+/**
+ * Implementation de hook_nodeapi
+ */
+function acreat_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+	if ($op == 'view' && $a4) { 
+		$GLOBALS["node"] = $node;
+	}
+}
+
+/* ---
+* Implementation de hook_menu
+*/
+function acreat_menu() {
+	$items = array();
+	
+	// gestion des pages statiques
+	$items['pages/%'] = array(
+		'title callback' => 'strtolower',
+		'title arguments' => array(1),
+		'page callback' => 'acreat_custom_page',
+		'page arguments' => array(1),
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+	
+	// flush_all_caches
+	$items['flush-caches'] = array(
+		'page callback' => 'acreat_flush_all_caches',
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+	);
+
+	// null
+	// page vide pour les page d'acceuil completement construite
+	$items['null'] = array(
+		'page callback' => 'drupal_get_title',
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+	);
+	
+	// gestion des pages statiques
+	$items['redirect/%menu_tail'] = array(
+		'page callback' => 'acreat_redirect',
+		'page arguments' => array(1),
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+	
+	// gestion de l'option firstchild
+	$items['<firstchild>'] = array(
+		'page callback' => true,
+		'access callback' => TRUE,
+		'type' => MENU_CALLBACK,
+	);
+	
+	return $items;
+}
+
+/**
+* Implementation of hook_form_alter().
+*/
+function acreat_form_alter(&$form, $form_state, $form_id) {
+
+	// Correction du bug de Pathauto : Pathauto coché automatiquement dans le formulaire d'édition du node 
+	if(module_exists("pathauto")) {
+		if (isset($form['#id']) && ($form['#id'] == 'node-form') && arg(0) == 'node') {
+			$node = $form['#node'];
+			$node->pathauto_perform_alias = ($node->path == '');
+			$form['path']['pathauto_perform_alias']['#default_value'] = $node->path == '' ? 1 : 0;
+		} 
+	}
+	
+	
+	// Correction du bug de menu item attibutes 
+	if($form['#id'] == 'node-form') {
+		if(isset($form['menu']) && !isset($form['menu']['#item']))
+			unset($form['menu']);
+	}
+	
+	
+	// <firstchild> 
+	if ($form_id == 'menu_overview_form') {
+		foreach ($form as $key => $value) {
+		  if (is_array($value) && isset($value['#item']['options']['unaltered_hidden'])) {
+			$item = $value['#item'];
+			$unaltered_hidden = $item['options']['unaltered_hidden'];
+			$form[$key]['hidden']['#default_value'] = !$unaltered_hidden;
+			$form[$key]['#attributes']['class'] = $unaltered_hidden ? 'menu-disabled' : 'menu-enabled';
+			$form[$key]['title']['#value'] = check_plain($item['title']) . ($unaltered_hidden ? ' ('. t('disabled') .')' : '');
+		  }
+		}
+	}
+	if ($form_id == 'menu_edit_item') {
+		if (isset($form['menu']['link_path'])) {
+		  $form['menu']['link_path']['#description'] .= t('Enter %firstchild to link to the item\'s first accessible child.', array('%firstchild' => '<firstchild>'));
+		  if (isset($form['menu']['#item']['options']['unaltered_hidden'])) {
+			$form['menu']['enabled']['#default_value'] = !$form['menu']['#item']['options']['unaltered_hidden'];
+		  }
+		}
+	}
+	
+	// Nodewords / Meta Tags : Collapsing fieldset
+	if(is_array($form["nodewords"]) && $form["nodewords"]["#type"] == "fieldset")
+		$form["nodewords"]["#collapsed"] = true;	
+}
+
+/**
+ * Implementation of hook_menu_link_alter().
+ */
+function acreat_menu_link_alter(&$item, $menu) {
+  // module menu
+  if ($item['module'] == 'menu') {
+    if ($item['link_path'] == '<firstchild>') {
+		$item['options']['alter'] = TRUE;
+    }
+    else {
+		unset($item['options']['unaltered_hidden']);
+    }
+  }
+  
+  // module admin_menu
+  if ($item['module'] == 'admin_menu') {
+	$item["title"] = "test";
+  
+  }
+  
+  
+}
+
+/**
+ * Implementation of hook_translated_menu_link_alter().
+ */
+function acreat_translated_menu_link_alter(&$item, $map) {
+  if (($item['module'] == 'menu') && ($item['link_path'] == '<firstchild>')) {
+    $href = acreat_get_firstchild_href($item['mlid']);
+    if ($href != NULL) {
+      if (isset($item['options']['unaltered_hidden'])) {
+        $item['hidden'] = (bool)$item['options']['unaltered_hidden'];
+        unset($item['options']['unaltered_hidden']);
+      }
+      $item['href'] = "redirect/$href";
+    }
+    elseif (!isset($item['options']['unaltered_hidden'])) {
+      $item['options']['unaltered_hidden'] = (bool)$item['hidden'];
+      $item['hidden'] = TRUE;
+    }
+  }
+}
+
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+ 
+/**
+ * Implementation of hook_theme_registry_alter().
+ *
+ * Make Acreat's page preprocess function run *after* everything else's
+ */
+function acreat_theme_registry_alter(&$theme_registry) {
+  if (isset($theme_registry['page'])) {
+    // If acreat's preprocess function is there already, remove it.
+    if ($key = array_search('acreat_preprocess_page', $theme_registry['page']['preprocess functions'])) {
+      unset($theme_registry['page']['preprocess functions'][$key]);
+    }
+    // Now tack it on at the end so it runs after everything else.
+    $theme_registry['page']['preprocess functions'][] = 'acreat_preprocess_page';
+  } 
+}
+
+
+/* ---
+* Implementation de template_preprocess_page
+*/
+function acreat_preprocess_page(&$variables) {
+
+	// Si une variable de session menu_real_active_item est définie, on rétablie la requête originale
+	// @see menu_set_active_item
+	if($GLOBALS["menu_real_active_item"]) 
+		$_GET["q"] = $GLOBALS["menu_real_active_item"];
+	
+	// ajout du theme_path dans les settings javascript
+	// remonté dans acreat_init <= ???
+	drupal_add_js(array('themePath' => base_path().path_to_theme()), "setting");
+	$variables["scripts"] = drupal_get_js();
+	
+	// classes
+	$body_classes = array_merge(drupal_get_body_classes(), explode(" ", $variables['body_classes']));
+	$include_css = array();	
+	
+	// ajout de la langue dans les body_classes
+	global $language;
+	$body_classes[] = 'language-'.$language->language;
+	
+	// ajout de l'arboressence menu dans le body classes
+	$active_t = menu_get_active_trail();
+
+	while($item = array_shift($active_t)) {
+		//if(!$item["link_path"]) continue;
+		if(!$item["href"] || $item["href"] == "<front>") continue;
+		$path = drupal_get_path_alias($item["href"]);
+		$elements = preg_split ("/\/|\s+/", $path);
+		$class  = "page";
+		//$template = "page";
+		foreach($elements as $element) {
+			if(!preg_match("/^\d+$/",$element)) {
+				if(variable_get("acreat_enable_old_body_classes", 0) == 1)
+					$body_classes[] = $element;
+				$class = $class."-".$element;
+				$body_classes[] = $class;
+				//$template = $template."-".$element;
+				//$variables['template_files'][] = $template; 
+			}
+		}
+	}
+
+	/* NODE */
+	if ($node = $variables['node']) {
+		// ajout de l'id de node dans les body_classes
+		$body_classes[] = 'node-'.$node->nid;
+		if(isset($node->taxonomy)) {
+			foreach($node->taxonomy as $term) {
+				$body_classes[] = 'taxonomy-tid-'.$term->tid;
+				$body_classes[] = 'taxonomy-vid-'.$term->vid;
+			}
+		}
+		array_splice($variables["template_files"], 1, 0, 'page-node-'.$node->type);
+	}
+
+	/* TAXONOMY */
+	if (arg(0) == "taxonomy" && arg(1) == "term" && preg_match("/^\d+$/", arg(2)) && $term = taxonomy_get_term(arg(2))) {
+		$body_classes[] = 'taxonomy-tid-'.$term->tid;
+		$body_classes[] = 'taxonomy-vid-'.$term->vid;
+	}
+	
+	// Détecter un fichier CSS particulier pout cette page et le rattacher
+	$front_style = path_to_theme() .'/css/style-front.css';
+	if ($variables['is_front'] && file_exists($front_style)) 
+		$include_css[] = $front_style;
+	
+	// css
+	if (count($include_css)) {
+		foreach($include_css as $css)
+			drupal_add_css($css, 'theme', 'all', FALSE);
+		$variables['styles'] = drupal_get_css();
+	}
+	
+	// body classes
+	$variables['body_classes'] = implode(' ', array_unique($body_classes));
+	
+}
+
+/* ---
+* acreat_id_safe
+* @see zen_id_safe
+*/
+function acreat_id_safe($string) {
+  // Replace with dashes anything that isn't A-Z, numbers, dashes, or underscores.
+  return strtolower(preg_replace('/[^a-zA-Z0-9-]+/', '-', $string));
+}
+
+/* ---
+* Implementation de template_preprocess_node
+*/
+function acreat_preprocess_node(&$variables) {
+	$node = $variables['node'];
+	$variables['template_files'][] = 'node-'.$node->nid; 
+}
+
+/*
+* Implementation de template_preprocess_flag
+* Correction du bug de lien du module FLAG
+* @see template_preprocess_flag
+* @see module Flag
+*/
+function acreat_preprocess_flag(&$variables) {
+	$old = $_GET["q"];
+	$_GET["q"] = $GLOBALS["q"];
+	$variables["link_href"] = preg_replace("/destination=[^&]*/si", drupal_get_destination(), $variables["link_href"]);
+	$_GET["q"] = $old;
+}
+
+/*******************************************************************************
+ * FORMULAIRES / validate / submit 
+ ******************************************************************************/
+
+ 
+ /*******************************************************************************
+ * PAGES / CALLBACk
+ ******************************************************************************/
+
+/* ---
+ * acreat_custom_page
+ * affiche une page statique située dans le dossier pages/ du site
+ */
+function acreat_custom_page($page) {
+	global $no_theme;
+	$file = sprintf("%s/pages/%s.php", conf_path(), $page);
+	if(!file_exists($file))
+		return drupal_not_found();
+	ob_start();
+	include($file);
+	$out = ob_get_clean();
+	return $out;
+}
+
+
+/* ---
+ * acreat_redirect
+ * redirige l'utilisateur vers une page en particulier
+ */
+function acreat_redirect() {
+	$args = func_get_args();
+	return drupal_goto(implode("/", $args), null, null, 301);
+}
+
+/* ---
+ * acreat_flush_all_caches
+ * réinitialise l'ensemble des caches du site internet
+ */
+function acreat_flush_all_caches($page) {
+	drupal_flush_all_caches();
+	drupal_set_message(t('Caches cleared'));
+	drupal_goto();
+}
+
+ 
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+ 
+ 
+/* -------------------------------------------------------------------------------------------------------------------------
+* ADMIN MENU
+------------------------------------------------------------------------------------------------------------------------- */
+
+/**
+* phptemplate_admin_menu_icon
+*/
+function phptemplate_admin_menu_icon() {
+	$path = base_path().drupal_get_path('module', 'acreat');
+	return '<img class="admin-menu-icon" src="'.$path.'/acreat_16x16.png" width="16" height="16" alt="Acreat Web Technologies" />';
+}
+
+/**
+* acreat_admin_menu
+*/
+function acreat_admin_menu($deleted) {
+	$links = array();
+	$path = drupal_is_front_page() ? '<front>' : $_GET['q'];
+	
+	// Lien vers Acreat.com
+	$links[] = array(
+		'title' => 'Acreat.com',
+		'path' => 'http://www.acreat.com',
+		'weight' => 100,
+		'parent_path' => '<front>',
+	);
+
+	return $links;
+}
+
+/**
+* acreat_get_firstchild_href
+*/
+function acreat_get_firstchild_href($mlid) {
+  global $language;
+  $result = db_query("SELECT mlid, link_path FROM {menu_links} WHERE plid = %d ORDER BY weight, link_title", $mlid);
+  while ($m = db_fetch_array($result)) {
+    if ($m['link_path'] != '<firstchild>') {
+      $child = menu_link_load($m['mlid']);
+      if (!empty($child['access']) && empty($child['hidden'])
+       && (!isset($child['localized_options']['langcode']) || ($child['localized_options']['langcode'] == $language->language))) {
+        return $m['link_path'];
+      }
+    }
+    else {
+      $href = acreat_get_firstchild_href($m['mlid']);
+      if ($href != NULL) {
+        return $href;
+      }
+    }
+  }
+  return NULL;
+}
+
+/* -------------------------------------------------------------------------------------------------------------------------
+* DB FUNCTIONS
+------------------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * drupal_save_record
+ * Sauvegarde le record selong les clés passés dans le paramètre update
+ * à la différence de drupal_write_record le row est inséré en cas de row introuvable
+ */
+function drupal_save_record($table, &$object, $update = array()) {
+	if(!count($update))
+		return drupal_write_record($table, &$object);
+		
+	if(!is_array($update))
+		$update = array($update);
+		
+	$schema = drupal_get_schema($table);
+	$conditions = array();
+	$values = array();
+	foreach ($update as $key){
+		// si une des clés d'update n'est pas présente, insertion directe
+		if(!isset($object->$key)) 
+			return drupal_write_record($table, &$object);
+		$conditions[] = "$key = ". db_type_placeholder($schema['fields'][$key]['type']);
+		$values[] = $object->$key;
+    }
+	$query = "SELECT 1 FROM {". $table ."} WHERE ". implode(' AND ', $conditions);
+	$exists = db_result(db_query($query, $values));
+	
+	return drupal_write_record($table, &$object, $exists ? $update : array());
+}
+
+/**
+ * db_fetch_one
+ * Récupere une cellule du résultat de requete
+* type : n (node) / v (version)
+ */
+function db_fetch_one($result) {
+	$result = db_fetch_array($result);
+	return current($result);
+}
+
+/* ---
+* db_update
+* Gère l'enregistrement d'un node spécifique dans une table extérieure
+*/
+function db_update($table, &$node, $type='update', $update_sql = 'vid = %d', $update_sql_tokens = false) {
+	
+	// si une demande de révision a été faite, on transforme l'update en insert
+	if($node->revision) 
+		$type = "insert";
+	
+	$fields = array();
+	$result = db_query("DESCRIBE {%s}", $table);
+	while($infos =  db_fetch_object($result))
+		$fields[] = $infos->Field;
+	
+	$row = array();
+	foreach($fields as $field) {
+		if(isset($node->$field))
+			$row[$field] = $node->$field;
+	}
+	
+	switch($type) {
+		case "insert":
+			$SQL = "INSERT INTO {%s} (".join(",", array_keys($row)).") VALUES (".join(",",array_fill(0, count(array_keys($row)), "'%s'")).")";
+			return call_user_func_array("db_query", array_merge(array($SQL, db_escape_table($table)), $row));
+		break;
+		case "update":
+			$update = array();
+			foreach($row as $key=>$value) 
+				$update[] = sprintf("%s = %s", $key, preg_match("/^[\d\.]$/", $value) ? "%d" : "'%s'");
+			if(!$update_sql_tokens) { $update_sql_tokens = array($node->vid); }			
+			$SQL = "UPDATE {%s} SET ".join(",",$update)." WHERE $update_sql";
+			return call_user_func_array("db_query", array_merge(array($SQL, db_escape_table($table)), $row, $update_sql_tokens));
+		break;
+	}
+	
+	return false;
+}
+
+/* ---
+* db_insert
+* Créé le node spécifique dans sa table
+*/
+function db_insert($table, &$node) {
+	return db_update($table, $node, 'insert');
+}
+
+/**
+ * db_delete
+ * Supprime le node dans la table spécifique
+* type : n (node) / v (version)
+ */
+function db_delete($table, &$node, $type="n") {
+	$type .= "id";
+	db_query("DELETE FROM {%s} WHERE $type = %d", db_escape_table($table), $node->$type);
+}
+
+
+/** -------------------------------------------------------------------------------------------------------------------------
+* DIVERS
+* ------------------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * drupal_add_body_class
+ */
+function drupal_add_body_class($class = null) {
+  static $classes;
+  
+  if(!isset($classes))
+	$classes = array();
+  
+  if (isset($class)) {
+	if(!is_array($class))
+		$class = array($class);
+	$classes = array_merge($classes, $class);
+  }
+  return array_unique($classes);
+}
+
+/**
+ * drupal_get_body_classes
+ */
+function drupal_get_body_classes() {
+  return drupal_add_body_class();
+}
+
+
+/**
+ * is_mobile
+ * Détecte si le browser est un téléphone mobile
+ */
+function drupal_is_mobile() {
+
+  $mobile_browser   = false;
+  $user_agent       = $_SERVER['HTTP_USER_AGENT'];
+  $accept           = $_SERVER['HTTP_ACCEPT'];
+
+  switch(true){
+
+    case (eregi('ipod',$user_agent)||eregi('iphone',$user_agent));
+      $mobile_browser = true;
+    break;
+
+    case (eregi('android',$user_agent));
+      $mobile_browser = true;
+    break;
+
+    case (eregi('opera mini',$user_agent));
+      $mobile_browser = true;
+    break;
+
+    case (eregi('blackberry',$user_agent));
+      $mobile_browser = true; 
+    break;
+
+    case (preg_match('/(up.browser|up.link|mmp|symbian|smartphone|midp|wap|vodafone|o2|pocket|kindle|pda|psp|treo)/i',$user_agent));	// |mobile	-->	redirigeait l'iPad
+      $mobile_browser = true;
+    break;
+
+    case ((strpos($accept,'text/vnd.wap.wml')>0)||(strpos($accept,'application/vnd.wap.xhtml+xml')>0));
+      $mobile_browser = true;
+    break;
+
+    case (isset($_SERVER['HTTP_X_WAP_PROFILE'])||isset($_SERVER['HTTP_PROFILE']));
+      $mobile_browser = true;
+    break;
+
+    case (in_array(strtolower(substr($user_agent,0,4)),array('1207'=>'1207','3gso'=>'3gso','4thp'=>'4thp','501i'=>'501i','502i'=>'502i','503i'=>'503i','504i'=>'504i','505i'=>'505i','506i'=>'506i','6310'=>'6310','6590'=>'6590','770s'=>'770s','802s'=>'802s','a wa'=>'a wa','acer'=>'acer','acs-'=>'acs-','airn'=>'airn','alav'=>'alav','asus'=>'asus','attw'=>'attw','au-m'=>'au-m','aur '=>'aur ','aus '=>'aus ','abac'=>'abac','acoo'=>'acoo','aiko'=>'aiko','alco'=>'alco','alca'=>'alca','amoi'=>'amoi','anex'=>'anex','anny'=>'anny','anyw'=>'anyw','aptu'=>'aptu','arch'=>'arch','argo'=>'argo','bell'=>'bell','bird'=>'bird','bw-n'=>'bw-n','bw-u'=>'bw-u','beck'=>'beck','benq'=>'benq','bilb'=>'bilb','blac'=>'blac','c55/'=>'c55/','cdm-'=>'cdm-','chtm'=>'chtm','capi'=>'capi','comp'=>'comp','cond'=>'cond','craw'=>'craw','dall'=>'dall','dbte'=>'dbte','dc-s'=>'dc-s','dica'=>'dica','ds-d'=>'ds-d','ds12'=>'ds12','dait'=>'dait','devi'=>'devi','dmob'=>'dmob','doco'=>'doco','dopo'=>'dopo','el49'=>'el49','erk0'=>'erk0','esl8'=>'esl8','ez40'=>'ez40','ez60'=>'ez60','ez70'=>'ez70','ezos'=>'ezos','ezze'=>'ezze','elai'=>'elai','emul'=>'emul','eric'=>'eric','ezwa'=>'ezwa','fake'=>'fake','fly-'=>'fly-','fly_'=>'fly_','g-mo'=>'g-mo','g1 u'=>'g1 u','g560'=>'g560','gf-5'=>'gf-5','grun'=>'grun','gene'=>'gene','go.w'=>'go.w','good'=>'good','grad'=>'grad','hcit'=>'hcit','hd-m'=>'hd-m','hd-p'=>'hd-p','hd-t'=>'hd-t','hei-'=>'hei-','hp i'=>'hp i','hpip'=>'hpip','hs-c'=>'hs-c','htc '=>'htc ','htc-'=>'htc-','htca'=>'htca','htcg'=>'htcg','htcp'=>'htcp','htcs'=>'htcs','htct'=>'htct','htc_'=>'htc_','haie'=>'haie','hita'=>'hita','huaw'=>'huaw','hutc'=>'hutc','i-20'=>'i-20','i-go'=>'i-go','i-ma'=>'i-ma','i230'=>'i230','iac'=>'iac','iac-'=>'iac-','iac/'=>'iac/','ig01'=>'ig01','im1k'=>'im1k','inno'=>'inno','iris'=>'iris','jata'=>'jata','java'=>'java','kddi'=>'kddi','kgt'=>'kgt','kgt/'=>'kgt/','kpt '=>'kpt ','kwc-'=>'kwc-','klon'=>'klon','lexi'=>'lexi','lg g'=>'lg g','lg-a'=>'lg-a','lg-b'=>'lg-b','lg-c'=>'lg-c','lg-d'=>'lg-d','lg-f'=>'lg-f','lg-g'=>'lg-g','lg-k'=>'lg-k','lg-l'=>'lg-l','lg-m'=>'lg-m','lg-o'=>'lg-o','lg-p'=>'lg-p','lg-s'=>'lg-s','lg-t'=>'lg-t','lg-u'=>'lg-u','lg-w'=>'lg-w','lg/k'=>'lg/k','lg/l'=>'lg/l','lg/u'=>'lg/u','lg50'=>'lg50','lg54'=>'lg54','lge-'=>'lge-','lge/'=>'lge/','lynx'=>'lynx','leno'=>'leno','m1-w'=>'m1-w','m3ga'=>'m3ga','m50/'=>'m50/','maui'=>'maui','mc01'=>'mc01','mc21'=>'mc21','mcca'=>'mcca','medi'=>'medi','meri'=>'meri','mio8'=>'mio8','mioa'=>'mioa','mo01'=>'mo01','mo02'=>'mo02','mode'=>'mode','modo'=>'modo','mot '=>'mot ','mot-'=>'mot-','mt50'=>'mt50','mtp1'=>'mtp1','mtv '=>'mtv ','mate'=>'mate','maxo'=>'maxo','merc'=>'merc','mits'=>'mits','mobi'=>'mobi','motv'=>'motv','mozz'=>'mozz','n100'=>'n100','n101'=>'n101','n102'=>'n102','n202'=>'n202','n203'=>'n203','n300'=>'n300','n302'=>'n302','n500'=>'n500','n502'=>'n502','n505'=>'n505','n700'=>'n700','n701'=>'n701','n710'=>'n710','nec-'=>'nec-','nem-'=>'nem-','newg'=>'newg','neon'=>'neon','netf'=>'netf','noki'=>'noki','nzph'=>'nzph','o2 x'=>'o2 x','o2-x'=>'o2-x','opwv'=>'opwv','owg1'=>'owg1','opti'=>'opti','oran'=>'oran','p800'=>'p800','pand'=>'pand','pg-1'=>'pg-1','pg-2'=>'pg-2','pg-3'=>'pg-3','pg-6'=>'pg-6','pg-8'=>'pg-8','pg-c'=>'pg-c','pg13'=>'pg13','phil'=>'phil','pn-2'=>'pn-2','ppc;'=>'ppc;','pt-g'=>'pt-g','palm'=>'palm','pana'=>'pana','pire'=>'pire','pock'=>'pock','pose'=>'pose','psio'=>'psio','qa-a'=>'qa-a','qc-2'=>'qc-2','qc-3'=>'qc-3','qc-5'=>'qc-5','qc-7'=>'qc-7','qc07'=>'qc07','qc12'=>'qc12','qc21'=>'qc21','qc32'=>'qc32','qc60'=>'qc60','qci-'=>'qci-','qwap'=>'qwap','qtek'=>'qtek','r380'=>'r380','r600'=>'r600','raks'=>'raks','rim9'=>'rim9','rove'=>'rove','s55/'=>'s55/','sage'=>'sage','sams'=>'sams','sc01'=>'sc01','sch-'=>'sch-','scp-'=>'scp-','sdk/'=>'sdk/','se47'=>'se47','sec-'=>'sec-','sec0'=>'sec0','sec1'=>'sec1','semc'=>'semc','sgh-'=>'sgh-','shar'=>'shar','sie-'=>'sie-','sk-0'=>'sk-0','sl45'=>'sl45','slid'=>'slid','smb3'=>'smb3','smt5'=>'smt5','sp01'=>'sp01','sph-'=>'sph-','spv '=>'spv ','spv-'=>'spv-','sy01'=>'sy01','samm'=>'samm','sany'=>'sany','sava'=>'sava','scoo'=>'scoo','send'=>'send','siem'=>'siem','smar'=>'smar','smit'=>'smit','soft'=>'soft','sony'=>'sony','t-mo'=>'t-mo','t218'=>'t218','t250'=>'t250','t600'=>'t600','t610'=>'t610','t618'=>'t618','tcl-'=>'tcl-','tdg-'=>'tdg-','telm'=>'telm','tim-'=>'tim-','ts70'=>'ts70','tsm-'=>'tsm-','tsm3'=>'tsm3','tsm5'=>'tsm5','tx-9'=>'tx-9','tagt'=>'tagt','talk'=>'talk','teli'=>'teli','topl'=>'topl','tosh'=>'tosh','up.b'=>'up.b','upg1'=>'upg1','utst'=>'utst','v400'=>'v400','v750'=>'v750','veri'=>'veri','vk-v'=>'vk-v','vk40'=>'vk40','vk50'=>'vk50','vk52'=>'vk52','vk53'=>'vk53','vm40'=>'vm40','vx98'=>'vx98','virg'=>'virg','vite'=>'vite','voda'=>'voda','vulc'=>'vulc','w3c '=>'w3c ','w3c-'=>'w3c-','wapj'=>'wapj','wapp'=>'wapp','wapu'=>'wapu','wapm'=>'wapm','wig '=>'wig ','wapi'=>'wapi','wapr'=>'wapr','wapv'=>'wapv','wapy'=>'wapy','wapa'=>'wapa','waps'=>'waps','wapt'=>'wapt','winc'=>'winc','winw'=>'winw','wonu'=>'wonu','x700'=>'x700','xda2'=>'xda2','xdag'=>'xdag','yas-'=>'yas-','your'=>'your','zte-'=>'zte-','zeto'=>'zeto','acs-'=>'acs-','alav'=>'alav','alca'=>'alca','amoi'=>'amoi','aste'=>'aste','audi'=>'audi','avan'=>'avan','benq'=>'benq','bird'=>'bird','blac'=>'blac','blaz'=>'blaz','brew'=>'brew','brvw'=>'brvw','bumb'=>'bumb','ccwa'=>'ccwa','cell'=>'cell','cldc'=>'cldc','cmd-'=>'cmd-','dang'=>'dang','doco'=>'doco','eml2'=>'eml2','eric'=>'eric','fetc'=>'fetc','hipt'=>'hipt','http'=>'http','ibro'=>'ibro','idea'=>'idea','ikom'=>'ikom','inno'=>'inno','ipaq'=>'ipaq','jbro'=>'jbro','jemu'=>'jemu','java'=>'java','jigs'=>'jigs','kddi'=>'kddi','keji'=>'keji','kyoc'=>'kyoc','kyok'=>'kyok','leno'=>'leno','lg-c'=>'lg-c','lg-d'=>'lg-d','lg-g'=>'lg-g','lge-'=>'lge-','libw'=>'libw','m-cr'=>'m-cr','maui'=>'maui','maxo'=>'maxo','midp'=>'midp','mits'=>'mits','mmef'=>'mmef','mobi'=>'mobi','mot-'=>'mot-','moto'=>'moto','mwbp'=>'mwbp','mywa'=>'mywa','nec-'=>'nec-','newt'=>'newt','nok6'=>'nok6','noki'=>'noki','o2im'=>'o2im','opwv'=>'opwv','palm'=>'palm','pana'=>'pana','pant'=>'pant','pdxg'=>'pdxg','phil'=>'phil','play'=>'play','pluc'=>'pluc','port'=>'port','prox'=>'prox','qtek'=>'qtek','qwap'=>'qwap','rozo'=>'rozo','sage'=>'sage','sama'=>'sama','sams'=>'sams','sany'=>'sany','sch-'=>'sch-','sec-'=>'sec-','send'=>'send','seri'=>'seri','sgh-'=>'sgh-','shar'=>'shar','sie-'=>'sie-','siem'=>'siem','smal'=>'smal','smar'=>'smar','sony'=>'sony','sph-'=>'sph-','symb'=>'symb','t-mo'=>'t-mo','teli'=>'teli','tim-'=>'tim-','tosh'=>'tosh','treo'=>'treo','tsm-'=>'tsm-','upg1'=>'upg1','upsi'=>'upsi','vk-v'=>'vk-v','voda'=>'voda','vx52'=>'vx52','vx53'=>'vx53','vx60'=>'vx60','vx61'=>'vx61','vx70'=>'vx70','vx80'=>'vx80','vx81'=>'vx81','vx83'=>'vx83','vx85'=>'vx85','wap-'=>'wap-','wapa'=>'wapa','wapi'=>'wapi','wapp'=>'wapp','wapr'=>'wapr','webc'=>'webc','whit'=>'whit','winw'=>'winw','wmlb'=>'wmlb','xda-'=>'xda-',)));
+      $mobile_browser = true;
+    break;
+
+  }
+  return $mobile_browser; // Retourne True si ses un mobile sinon False.
+}
+
+/**
+ * print_pre
+ */
+function print_pre($data, $die = true) {
+	print "<hr><pre>";
+	print_r( $data );
+	print "</pre><hr>";
+	if($die) die;
+}
+
+/**
+ * module_path
+ * Retourne le path vers un module particulier
+ */
+function module_path($module, $path="", $base_path=true) {
+	return ($base_path?base_path():"").drupal_get_path('module', $module).($path?"/".$path:"");
+}
+
+/**
+ * theme_path
+ * Retourne le path vers un theme
+ */
+function theme_path($path="") {
+	return base_path().path_to_theme().($path?"/".$path:"");
+}
+
+/**
+ * block_content
+ * renvoi le contenu d'un bloc
+ */
+function block_content($module, $delta=0) {
+	$block = module_invoke($module, 'block', 'view', $delta);
+	return $block['content'];
+}
+
+
+/**
+* acreat_set_location
+* Change la localisation (menu, breadcrumb de la page actuelle
+* inspiré du module node_breadcrumb
+*/
+function acreat_set_location($path, $title = false, $href = false) {
+	$mid = db_result(db_query("SELECT mlid FROM menu_links WHERE link_path = '%s'", $path));
+	if(!$mid) return drupal_set_message("acreat_set_location : ce chemin n'existe pas : $path", 'error');
+	
+	$item = menu_link_load($mid);
+	menu_local_tasks(0);
+	menu_set_active_menu_name($menu_name = $item['menu_name']);
+	$GLOBALS["menu_real_active_item"] = $_GET["q"];
+	menu_set_active_item($item['link_path']);
+
+	$active_trail = _menu_reset_active_trail();
+	menu_set_active_trail($active_trail);
+	$breadcrumb = menu_get_active_breadcrumb();
+	
+	// ajouter l'élément visé
+	$end = end($active_trail);
+	if($end)
+		$breadcrumb[] = l($end['title'], $end['href'], $end['localized_options']);
+	
+	// si l'utilisateur a spécifier un dernier élément
+	if($title) 
+		$breadcrumb[] = $href ? l($title, $href) : $title;
+	
+	drupal_set_breadcrumb($breadcrumb);
+	
+	if(module_exists('menu_breadcrumb'))
+		menu_breadcrumb_init();	
+}
+
+/**
+* _menu_reset_active_trail
+* Reprend exactement menu_set_active_trail mais force la mise à jour en supprimant la variable static $trail
+* @see menu_set_active_trail
+* @see acreat_set_location
+*/
+function _menu_reset_active_trail() {
+	$trail = array();
+    $trail[] = array('title' => t('Home'), 'href' => '<front>', 'localized_options' => array(), 'type' => 0);
+    $item = menu_get_item();
+	
+    // Check whether the current item is a local task (displayed as a tab).
+    if ($item['tab_parent']) {
+      // The title of a local task is used for the tab, never the page title.
+      // Thus, replace it with the item corresponding to the root path to get
+      // the relevant href and title.  For example, the menu item corresponding
+      // to 'admin' is used when on the 'By module' tab at 'admin/by-module'.
+      $parts = explode('/', $item['tab_root']);
+      $args = arg();
+      // Replace wildcards in the root path using the current path.
+      foreach ($parts as $index => $part) {
+        if ($part == '%') {
+          $parts[$index] = $args[$index];
+        }
+      }
+      // Retrieve the menu item using the root path after wildcard replacement.
+      $root_item = menu_get_item(implode('/', $parts));
+      if ($root_item && $root_item['access']) {
+        $item = $root_item;
+      }
+    }
+
+    $tree = menu_tree_page_data(menu_get_active_menu_name());
+    list($key, $curr) = each($tree);
+
+    while ($curr) {
+      // Terminate the loop when we find the current path in the active trail.
+      if ($curr['link']['href'] == $item['href']) {
+        $trail[] = $curr['link'];
+        $curr = FALSE;
+      }
+      else {
+        // Add the link if it's in the active trail, then move to the link below.
+        if ($curr['link']['in_active_trail']) {
+          $trail[] = $curr['link'];
+          $tree = $curr['below'] ? $curr['below'] : array();
+        }
+        list($key, $curr) = each($tree);
+      }
+    }
+    // Make sure the current page is in the trail (needed for the page title),
+    // but exclude tabs and the front page.
+    $last = count($trail) - 1;
+    if ($trail[$last]['href'] != $item['href'] && !(bool)($item['type'] & MENU_IS_LOCAL_TASK) && !drupal_is_front_page()) {
+      $trail[] = $item;
+    }
+	return $trail;
+}
+
+/**
+ * language_list_order
+ * Retourne la liste des langue de drupal (language_list) mais avec la langue par défaut mise en première
+ */
+function language_list_order($field = 'language', $reset = FALSE) {
+	$_languages = language_list($field, $reset);
+	$languages = array(language_default("language") => $_languages[language_default("language")]);
+	unset($_languages[language_default("language")]);
+	$languages += $_languages;
+	return $languages;
+}
+
+/**
+ * pager_infos
+ * Recupère les infos d'un pager
+ */
+function pager_infos($field = 'total_items', $element = '0') {
+	global $pager_page_array, $pager_total, $pager_total_items;
+	$return = false;
+	eval('$return = $pager_'.$field.'['.$element.'];');
+	return $return;
+}
+
+/**
+* set_admin_theme
+* Force Drupal a utiliser le theme administrateur
+*/
+function set_admin_theme() {
+	global $custom_theme;
+	$custom_theme = variable_get('admin_theme', '0');
+	drupal_add_css(drupal_get_path('module', 'system') .'/admin.css', 'module');
+}
+
+
+/**
+* user_multiple_access
+* Permet de checker plusieurs type d'accès
+*/
+function user_multiple_access($strings, $absolute=false, $account = NULL, $reset = FALSE) {
+	if(!is_array($strings))
+		$strings = array_map("trim", explode(",", $strings));
+	
+	foreach($strings as $string) {
+		$result = user_access($string, $account, $reset);
+		if(!$result && $absolute) 
+			return false;
+		if($result && !$absolute) 
+			return true;
+	}
+	return false;
+}
+
+
+/**
+* user_mail_more_tokens
+* Return an array of token to value mappings for user e-mail messages.
+* @see user_mail_tokens
+*/
+function user_mail_more_tokens($account, $language) {
+	$tokens = user_mail_tokens($account, $language);
+	$xtra_fields = unserialize($account->data);
+	$tokens += array_to_tokens($xtra_fields);
+	return $tokens;
+}
+
+/**
+* array_to_tokens
+* Retourne un tableau sous forme de tokens !
+*/
+function array_to_tokens($fields) {
+	$tokens = array();
+	foreach($fields as $field=>$value) {
+		if(!is_array($value))
+			$tokens["!$field"] = $value;
+	}
+	return $tokens;
+}
+
+/**
+* translated_nid
+* Retourne le nid du node traduit, ou du node de la langue par défaut
+*/
+function translated_nid($nid) {
+	global $language;
+	$default = language_default('language');
+	$translations = translation_node_get_translations($nid);
+	if($translations) {
+		if(isset($translations[$language->language]))
+			$nid = (int)$translations[$language->language]->nid;
+		elseif(isset($translations[$default]))
+			$nid = (int)$translations[$default]->nid;		
+	}
+	return $nid;
+}
+	
+/**
+ * Améliore le comportement de drupal_alter
+ * pour l'appel par référence
+ */
+function acreat_alter($hook, $a1 = NULL, $a2 = NULL, $a3 = NULL, $a4 = NULL, $a5 = NULL) { 
+	foreach (module_implements($hook .'_alter') as $module) {
+		$function = $module .'_'. $hook .'_alter';
+		return ($function($a1, $a2, $a3, $a4, $a5));
+	}
+}
+	
+/** -------------------------------------------------------------------------------------------------------------------------
+* AHAH
+* ------------------------------------------------------------------------------------------------------------------------- */
+
+/*
+  This function is largely based on the poll module, its been simplified for reuse.
+  $fields is the specific form elements you want to attach via ahah,
+  $name is the form fields array key... e.g. the name for $form['title'] is "title"
+*/ 
+	
+function ahah_add($name, $fields) {	
+	$form_state = array('submitted' => FALSE);
+	$form_build_id = $_POST['form_build_id'];
+
+	// Add the new element to the stored form. Without adding the element to the
+	// form, Drupal is not aware of this new elements existence and will not
+	// process it. We retreive the cached form, add the element, and resave.
+	$form = form_get_cache($form_build_id, $form_state);
+	
+	eval("\$item = &\$form[$name];");
+	$item = $fields;
+	
+	form_set_cache($form_build_id, $form, $form_state);
+	$form += array(
+		'#post' => $_POST,
+		'#programmed' => FALSE,
+	);
+	
+	// Rebuild the form.
+	$form = form_builder($_POST['form_id'], $form, $form_state);
+
+	// Render the new output.
+	return drupal_render($item);    
+}	
+	
+
+/*
+* ahah_remove
+* supprime un  champ du cache d'un formulaire
+*/ 
+function ahah_remove($name) { 
+	$args = func_get_args();
+	$form_state = array('submitted' => FALSE);
+	$form_build_id = $_POST['form_build_id'];
+	$form = form_get_cache($form_build_id, $form_state);
+	@eval("unset(\$form[$name]);");
+	form_set_cache($form_build_id, $form, $form_state);
+	return true;
+}
+
+/** -------------------------------------------------------------------------------------------------------------------------
+* TRANSLATE
+* ------------------------------------------------------------------------------------------------------------------------- */
+function _tt($id, $string, $args=array()) {
+	$string = tt($id, $string);
+	if($string) 
+		$string = strtr($string, $args);
+	return $string;
+}
+
+/** -------------------------------------------------------------------------------------------------------------------------
+* CCK
+* ------------------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * install_ckk_field
+ * Installe automatiquement un champs CCK
+ */
+function install_ckk_field($field) {
+	module_load_include('inc', 'content', 'includes/content.crud');
+	$type = $field["type_name"];
+	$name = $field["field_name"];
+	$label = $field["label"];
+	$instances = content_field_instance_read(array('field_name' => $name, 'type_name' => $type));
+	if (sizeof($instances) < 1) {
+		if (content_field_instance_create($field)) 
+			drupal_set_message(t('Le champ CCK suivant a été créé : %label.', array('%label' => $label)));
+		else 
+			drupal_set_message(t('Il y a eu un problème lors de la création du champ %label.', array('%label' => $label)));
+	}
+}

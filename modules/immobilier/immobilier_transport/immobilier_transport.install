@@ -1,0 +1,46 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_install()
+ */
+function immobilier_transport_install() {
+	drupal_install_schema('immobilier_transport');
+	
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function immobilier_transport_uninstall() {  
+	//drupal_uninstall_schema('immobilier');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function immobilier_transport_schema() { 
+	$schema['immo_transport_station'] = array(
+		'fields' => array(
+			 'sid' => array('type' => 'serial', 'not null' => TRUE, 'disp-width' => '11'),
+			 'ligne' => array('type' => 'varchar', 'length' => '64', 'not null' => TRUE),
+			 'station' => array('type' => 'varchar', 'length' => '64', 'not null' => TRUE),
+			 'latitude' => array('type' => 'float', 'size' => 'big', 'not null' => TRUE),
+			 'longitude' => array('type' => 'float', 'size' => 'big', 'not null' => TRUE)),
+		'primary key' => array('sid'),
+	);
+
+	$schema['immo_transport_station_annonce'] = array(
+		'fields' => array(
+			 'nid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'sid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'distance' => array('type' => 'float', 'size' => 'big', 'not null' => TRUE)),
+		'primary key' => array('nid', 'sid'),
+	);
+	
+	return $schema;
+}
+

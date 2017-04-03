@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="3"
+   name=""
+   committed-date="2007-01-19T05:38:29.668773Z"
+   url="svn://agoraproduction.com:3343/srv/www/htdocs/web14/files/zend_db/Php/MDB2/PEAR"
+   last-author="david"
+   kind="dir"
+   uuid="4ce37cf7-5d27-0410-aafa-bac4ba9a4159"
+   revision="29"/>
+<entry
+   committed-rev="3"
+   name="Exception.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="c1fb45acc06d215c2e07ded302da726b"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="ErrorStack.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="e81c6ed7ef266a02c0321eff63bf1d7e"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+</wc-entries>

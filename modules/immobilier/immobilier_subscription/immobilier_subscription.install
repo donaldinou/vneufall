@@ -1,0 +1,54 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+ 
+/**
+ * Implementation of hook_install()
+ */
+function immobilier_subscription_install() {
+	drupal_install_schema('immobilier_subscription');
+}
+
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function immobilier_subscription_uninstall() {  
+	// schema
+	drupal_uninstall_schema('immobilier_subscription');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function immobilier_subscription_schema() { 
+
+	$schema['immo_subscription'] = array(
+		'fields' => array(
+			 'sid' => array('type' => 'serial', 'not null' => TRUE, 'disp-width' => '11'),
+			 'mail' => array('type' => 'varchar', 'length' => '255', 'not null' => TRUE),
+			 'type' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'search' => array('type' => 'text', 'not null' => TRUE),
+			 'data' => array('type' => 'text', 'not null' => TRUE),
+			 'created' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'changed' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'active' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'disp-width' => '4')),
+		'primary key' => array('sid'),
+		'indexes' => array(
+			 'type' => array('type')),
+	);
+	
+	$schema['immo_subscription_stats'] = array(
+		'fields' => array(
+			 'sid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'nid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'timestamp' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11')),
+		'indexes' => array(
+			 'nid' => array('nid'),
+			 'sid' => array('sid')),
+	);
+
+	return $schema;
+}

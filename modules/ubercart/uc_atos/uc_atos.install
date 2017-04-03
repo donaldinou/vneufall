@@ -1,0 +1,17 @@
+<?php
+// $Id: uc_atos.install,v 1.1 2008/11/04 10:52:13 zmove Exp $
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function uc_atos_uninstall() {
+  variable_del('uc_atos_method_description');
+  variable_del('uc_atos_bank');
+  variable_del('uc_atos_language');
+  variable_del('uc_atos_method_description');
+  variable_del('uc_atos_api_version');
+  variable_del('uc_atos_api_pathfile');
+  variable_del('uc_atos_api_pathrequest');
+  variable_del('uc_atos_api_pathresponse');
+}
+

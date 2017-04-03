@@ -1,0 +1,16 @@
+<?php
+// $Id: system.install,v 1.238.2.12 2009/02/25 14:02:46 goba Exp $
+
+/**
+ * hook_install() 
+ */
+function acreat_private_node_install() {
+	db_query("ALTER TABLE {node} ADD COLUMN private int(11) NOT NULL default 0");
+}
+	
+/**
+ * hook_uninstall() 
+ */
+function acreat_private_node_uninstall() {
+	db_query("ALTER TABLE {node} DROP COLUMN private");
+}

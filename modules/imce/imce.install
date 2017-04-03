@@ -1,0 +1,73 @@
+<?php
+// $Id: imce.install,v 1.3.2.1 2010/05/14 19:55:44 ufku Exp $
+
+/**
+ * @file
+ * Installs, updates, and uninstalls IMCE.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function imce_install() {
+  module_load_include('inc', 'imce', 'inc/imce.core.profiles');
+  imce_install_profiles();
+  drupal_set_message(t('!module has been installed.', array('!module' => l('IMCE', 'admin/settings/imce'))));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function imce_uninstall() {
+  variable_del('imce_profiles');
+  variable_del('imce_roles_profiles');
+  variable_del('imce_settings_textarea');
+  variable_del('imce_settings_replace');
+  variable_del('imce_settings_thumb_method');
+  variable_del('imce_custom_content');
+  variable_del('imce_custom_process');
+  variable_del('imce_custom_scan');
+}
+
+/**
+ * Update from 5.x to 6.x.
+ */
+function imce_update_6000() {
+  module_load_include('inc', 'imce', 'inc/imce.core.profiles');
+  imce_install_profiles();
+  return array();
+}
+
+/**
+ * New option: total user quota.
+ */
+function imce_update_6001() {
+  $profiles = variable_get('imce_profiles', array());
+  foreach ($profiles as $id => $profile) {
+    $profiles[$id]['tuquota'] = 0;
+  }
+  variable_set('imce_profiles', $profiles);
+  return array();
+}
+
+/**
+ * Make file browser tab optional in user profiles.
+ */
+function imce_update_6002() {
+  $profiles = variable_get('imce_profiles', array());
+  foreach ($profiles as $id => $profile) {
+    $profiles[$id]['usertab'] = isset($profiles[$id]['usertab']) ? $profiles[$id]['usertab'] : 1;
+  }
+  variable_set('imce_profiles', $profiles);
+  return array(array('success' => TRUE, 'query' => 'File browser tab in user profiles was made optional.'));
+}
+
+
+/**
+ * Convert 6.x-1.x to 6.x-2.x
+ */
+function imce_update_6200() {
+  //delete deprecated variables
+  variable_del('imce_settings_absurls');
+  return array();
+}

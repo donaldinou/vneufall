@@ -1,0 +1,220 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+
+/**
+ * Implementation of hook_requirements()
+ */
+ function immobilier_requirements($phase) {
+  $requirements = array();
+  // Ensure translations don't break at install time.
+  $t = get_t();
+
+  if ($phase == 'runtime') {
+
+    $immobilier_directory = file_create_path() .'/immobilier';
+    if (!file_check_directory($immobilier_directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS)) {
+		if (!is_dir($immobilier_directory)) {
+			$requirements['immobilier_directory'] = array(
+			  'title' => $t('Immobilier Directory'),
+			  'value' => $t('%p does not a directory or is not readable by the webserver.', array('%p' => $immobilier_directory)),
+			  'severity' => REQUIREMENT_ERROR,
+			);
+		}
+		elseif (!is_writable($immobilier_directory)) {
+			$requirements['immobilier_directory'] = array(
+			  'title' => $t('Immobilier Directory'),
+			  'value' => $t('%p is not writeable by the webserver.', array('%p' => $immobilier_directory)),
+			  'severity' => REQUIREMENT_ERROR,
+			);
+		}
+		else {
+			$requirements['immobilier_directory'] = array(
+			  'title' => $t('Immobilier Directory'),
+			  'value' => $t('An unknown error occured.'),
+			  'description' => $t('An unknown error occured trying to verify %p is a directory and is writable.', array('%p' => $immobilier_directory)),
+			  'severity' => REQUIREMENT_ERROR,
+			);
+		}
+	}
+  }
+  return $requirements;
+}
+
+/**
+ * Implementation of hook_install()
+ */
+function immobilier_install() {
+	require_once drupal_get_path("module", "immobilier")."/immobilier.module";
+	drupal_install_schema('immobilier');
+	
+	//categories
+	if(!immobilier_variable_get('categories_vid')) {
+		$vocabulary = array(
+			'name' 		=> 'Catégorie',
+			'multiple' 	=> 0,
+			'required' 	=> 1,
+			'hierarchy' => 0,
+			'relation' 	=> 0,
+			'module'	=> 'immobilier'
+		);
+		taxonomy_save_vocabulary($vocabulary);
+		$vid = $vocabulary['vid'];
+		immobilier_variable_set('categories_vid', $vid);
+		
+		foreach(array('Appartement', 'Maison', 'Terrain', 'Stationnement') as $cat) {
+			$term = array('vid' => $vid, 'name' => $cat);
+			taxonomy_save_term($term);
+		}
+	}
+	
+	//secteurs
+	if(!immobilier_variable_get('secteurs_vid')) {
+		$vocabulary = array(
+			'name' 		=> 'Secteur',
+			'multiple' 	=> 0,
+			'required' 	=> 1,
+			'hierarchy' => 1,
+			'relation' 	=> 0,
+			'module'	=> 'immobilier'
+		);
+		taxonomy_save_vocabulary($vocabulary);
+		$vid = $vocabulary['vid'];
+		immobilier_variable_set('secteurs_vid', $vid);
+	}
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function immobilier_uninstall() {  
+	//taxonomy
+	//taxonomy_del_vocabulary(immobilier_variable_get('secteurs_vid'));
+	//taxonomy_del_vocabulary(immobilier_variable_get('categories_vid'));
+	// schema
+	drupal_uninstall_schema('immobilier');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function immobilier_schema() { 
+
+	$schema['immo_type'] = array(
+		'fields' => array(
+			 'type' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'name' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+			 'module' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE)),
+		'primary key' => array('type'),
+	);
+	
+	$schema['immo_secteur'] = array(
+		'fields' => array(
+			 'tid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'latitude' => array('type' => 'float', 'not null' => FALSE),
+			 'longitude' => array('type' => 'float', 'not null' => FALSE),
+			 'polyline' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+			 'levels' => array('type' => 'varchar', 'length' => '128', 'not null' => FALSE)),
+		'primary key' => array('tid'),
+	);
+	
+	$schema['immo_files'] = array(
+		'fields' => array(
+			 'fid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'vid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'nid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'type' => array('type' => 'varchar', 'length' => '10', 'not null' => TRUE),
+			 'description' => array('type' => 'varchar', 'length' => '128', 'not null' => TRUE),
+			 'weight' => array('type' => 'int', 'size' => 'tiny', 'not null' => FALSE, 'disp-width' => '4')),
+		'primary key' => array('fid'),
+		'indexes' => array(
+			 'nid' => array('nid'),
+			 'vid' => array('vid')),
+	);
+	
+	$schema['immo_annonce'] = array(
+		'fields' => array(
+			 'vid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'nid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'aid' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'reference' => array('type' => 'varchar', 'length' => '16', 'not null' => FALSE),
+			 'type' => array('type' => 'varchar', 'length' => '10', 'not null' => FALSE),
+			 'categorie_tid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'title' => array('type' => 'varchar', 'length' => '64', 'not null' => FALSE),
+			 'secteur_tid' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'pieces' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'chambres' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'sallesdb' => array('type' => 'int', 'not null' => FALSE, 'disp-width' => '11'),
+			 'surface' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'surface_sejour' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'chauffage' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'exposition' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'dpe_note' => array('type' => 'varchar', 'length' => '1', 'not null' => FALSE),
+			 'dpe_conso' => array('type' => 'int', 'size' => 'small', 'not null' => FALSE, 'disp-width' => '6'),
+			 'ges_note' => array('type' => 'varchar', 'length' => '1', 'not null' => FALSE),
+			 'ges_emiss' => array('type' => 'int', 'size' => 'small', 'not null' => FALSE, 'disp-width' => '6'),
+			 'annee' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'niveaux' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'etage' => array('type' => 'int', 'not null' => TRUE, 'disp-width' => '11'),
+			 'terrain' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'prix' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'charges' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'honoraires' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'depot_garantie' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'body' => array('type' => 'text', 'not null' => FALSE),
+			 'caracteristiques' => array('type' => 'varchar', 'length' => '255', 'not null' => FALSE),
+			 'exclusif' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'disp-width' => '4'),
+			 'disponibilite' => array('type' => 'datetime', 'not null' => TRUE),
+			 'adresse' => array('type' => 'varchar', 'length' => '45', 'not null' => FALSE),
+			 'quartier' => array('type' => 'varchar', 'length' => '64', 'not null' => FALSE),
+			 'code_postal' => array('type' => 'varchar', 'length' => '5', 'not null' => FALSE),
+			 'ville' => array('type' => 'varchar', 'length' => '45', 'not null' => FALSE),
+			 'latitude' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'longitude' => array('type' => 'float', 'size' => 'big', 'not null' => FALSE),
+			 'type_coords' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'data' => array('type' => 'text', 'size' => 'big', 'not null' => FALSE),
+			 'source' => array('type' => 'varchar', 'length' => '45', 'not null' => TRUE),
+			 'flag_update' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'disp-width' => '4')),
+		'primary key' => array('vid'),
+		'unique keys' => array(
+			 'agence_tid' => array('aid', 'reference')),
+		'indexes' => array(
+			 'fk_ANNONCE_AGENCE1' => array('aid'),
+			 'fk_ANNONCE_SECTEUR1' => array('secteur_tid'),
+			 'fk_ANNONCE_TYPE_BIEN1' => array('categorie_tid'),
+			 'fk_immo_annonce_immo_type1' => array('type')),
+	);
+
+
+	$schema['immo_agence'] = array(
+		'fields' => array(
+			 'aid' => array('type' => 'serial', 'not null' => TRUE, 'disp-width' => '11'),
+			 'nom' => array('type' => 'varchar', 'length' => '45', 'not null' => TRUE),
+			 'adresse' => array('type' => 'varchar', 'length' => '128', 'not null' => TRUE),
+			 'cp' => array('type' => 'varchar', 'length' => '5', 'not null' => TRUE),
+			 'ville' => array('type' => 'varchar', 'length' => '64', 'not null' => TRUE),
+			 'tel' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'fax' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE),
+			 'mail' => array('type' => 'varchar', 'length' => '64', 'not null' => TRUE),
+			 'latitude' => array('type' => 'float', 'size' => 'big', 'not null' => TRUE),
+			 'longitude' => array('type' => 'float', 'size' => 'big', 'not null' => TRUE),
+			 'infos' => array('type' => 'varchar', 'length' => '128', 'not null' => TRUE),
+			 'picture' => array('type' => 'varchar', 'length' => '255', 'not null' => TRUE),
+			 'source' => array('type' => 'varchar', 'length' => '45', 'not null' => TRUE),
+			 'weight' => array('type' => 'int', 'size' => 'tiny', 'not null' => TRUE, 'disp-width' => '4')),
+		'primary key' => array('aid'),
+	);
+	
+	$schema['immo_type_categorie'] = array(
+		'fields' => array(
+			 'type' => array('type' => 'varchar', 'length' => '32', 'not null' => TRUE, 'default' => ''),
+			 'tid' => array('type' => 'int', 'not null' => TRUE, 'default' => 0, 'disp-width' => '10')),
+		'primary key' => array('type', 'tid'),
+	);
+
+
+	return $schema;
+}

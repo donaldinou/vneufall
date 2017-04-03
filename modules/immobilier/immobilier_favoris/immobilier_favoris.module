@@ -1,0 +1,260 @@
+<?php
+// $Id: immobilier.module,v 1.0 2009/09/08 11:30:00$
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+ 
+/* ---
+* Implémentation de hook_menu
+*/
+function immobilier_favoris_menu() {
+	$items = array();
+
+	$items['user/%user_uid_optional/favoris'] = array(
+		'title' 			=> 'Panier de sélection',
+		'description' 		=> "Liste des annonces que vous avez sélectionné",
+		'page callback'  	=> 'immobilier_favoris_page',
+		'page arguments' 	=> array(1),
+		'title callback' 	=> 'immobilier_favoris_page_title',
+		'access callback' 	=> 'immobilier_favoris_page_access',
+		'access arguments' 	=> array(1),
+		'type' 				=> MENU_NORMAL_ITEM,
+	);
+	
+	$items['user/%user/favoris/detail'] = array(
+		'title' 			=> 'Annonce sélectionnée',
+		'description' 		=> "Annonce sélectionnée",
+		'page callback'  	=> 'immobilier_favoris_detail_page',
+		'page arguments' 	=> array(1),
+		'access callback' 	=> 'immobilier_favoris_page_access',
+		'access arguments' 	=> array(1),
+		'type' 				=> MENU_CALLBACK,
+	);
+	
+	$items['admin/immobiliers/settings/favoris'] = array(
+		'title' 			=> "Favoris",
+		'description' 		=> "Configuration de la sélection d'annonce",
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' 	=> array('immobilier_favoris_settings_form'),
+		'access arguments' 	=> array('access administration pages')
+	);
+
+	return $items;
+}
+
+/* ---
+* Implémentation de hook_flag_default_flags
+*/
+function immobilier_favoris_flag_default_flags() {
+	$flags = array();
+	$flags[] = array ( 
+		'content_type' 	=> 'node',
+		'name' 			=> 'immobilier_favoris', 
+		'title' 		=> 'Ma sélection d\'annonce',
+		'global' 		=> false,
+		'types'			=> array_keys(immobilier_get_types()),
+		'flag_short' 	=> 'Ajouter à ma sélection',
+		'flag_long' 	=> 'Ajouter cette annonce à ma sélection',
+		'flag_message' 	=> 'Cette annonce a été ajoutée à votre sélection.', 
+		'unflag_short' 	=> 'Retirer de ma sélection',
+		'unflag_long' 	=> 'Retirer cette annonce de ma sélection',
+		'unflag_message' => 'Cette annonce a été retirée de votre sélection.',
+		'unflag_denied_text' => '', 
+		'link_type' 	=> 'normal', 
+		'roles' 		=> array ('flag' => array(1,2),'unflag' => array(1,2)),
+		'show_on_page' 	=> TRUE,
+		'show_on_teaser' => TRUE,
+		'show_on_form' 	=> FALSE,
+		'access_author' => '', 
+		'i18n' 			=> 0,
+		'status' 		=> true,
+		'locked' 		=> array('name', 'types', 'roles', 'global', 'unflag_denied_text', 'access_author'),
+		'api_version' 	=> 2
+	);
+	return $flags;
+}
+
+/**
+ * Implementation de hook_theme
+ */
+function immobilier_favoris_theme() {
+	return array(
+		'immobilier_favoris' => array(
+		  'arguments' => array('nodes' => NULL,'search' => NULL),
+		  'template' => 'immobilier-favoris'
+		)
+	);
+}
+
+
+/*******************************************************************************
+ * HOOKS IMMOBILIER
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * FORMULAIRES
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+
+/**
+* Page de consultation du panier
+* @see immobilier_favoris_menu()
+*/
+function immobilier_favoris_page($account = null) {
+	global $user, $pager_page_array, $pager_total, $pager_total_items;
+	$nodes = array();
+	
+	if(!$account) $account = $user;
+	
+	// récupération de la liste des favoris
+	$nids = immobilier_favoris_get_user_flags($account);
+		
+	// objet recherche
+	$search = new stdClass();
+	$search->path 	= "user/".$account->uid."/favoris";
+	$search->limit 	= immobilier_variable_get("favoris_pager_limit", 0);
+	
+	if(count($nids)) {
+		// requete 
+		$query = immobilier_annonce_sql("n.status = 1 AND annonce.nid IN (".implode(",", $nids).")");
+		if($search->limit > 0) {
+			$count_query = preg_replace(array('/SELECT.*?FROM /As', '/ORDER BY .*/', '/GROUP BY .*/'), array('SELECT COUNT(DISTINCT annonce.nid) FROM ', '', ''), $query);
+			$result = pager_query($query,$search->limit,0, $count_query);	
+			$search->total 	= $pager_total_items[0];
+			$search->page = $pager_page_array[0];
+		} else { 
+			$result = db_query($query);
+			$search->total 	= db_affected_rows($result);
+			$search->page = 0;
+		}
+		// nodes
+		while ($node = db_fetch_object($result)) {
+			$node->search = clone $search;
+			$node->search->index = $search->page * $search->limit + ($key++);
+			$nodes[] = $node;
+		}
+	}
+	
+	// breadcrumb
+	$breadcrumb = array(
+		l(t('Home'), NULL), 
+		l(t('My account'), 'user'),
+		immobilier_favoris_page_title()
+	);
+	drupal_set_breadcrumb($breadcrumb);
+		
+	return theme("immobilier_favoris", $nodes, $search);
+}
+
+
+/**
+* Page de consultation d'une annonce de la sélection
+* @see immobilier_favoris_menu()
+*/
+function immobilier_favoris_detail_page($account = null) {
+	global $pager_page_array;
+	if(!$account) $account = $user;
+	
+	// récupération de la liste des favoris
+	$nids = immobilier_favoris_get_user_flags($account);
+	if(!count($nids))
+		return drupal_goto("user/".$account->uid."/favoris");
+	
+	// requete 
+	$query = immobilier_annonce_sql("n.status = 1 AND annonce.nid IN (".implode(",", $nids).")");
+	$count_query = preg_replace(array('/SELECT.*?FROM /As', '/ORDER BY .*/', '/GROUP BY .*/'), array('SELECT COUNT(DISTINCT annonce.nid) FROM ', '', ''), $query);
+	$result = pager_query($query,1,0, $count_query);
+	
+	// objet recherche
+	$search = new stdClass();
+	$search->path 	= "user/".$account->uid."/favoris";
+	$search->title 	= "sdsd";
+	$search->index 	= $pager_page_array[0];
+	$search->limit 	= immobilier_variable_get("favoris_pager_limit", 0);
+	$search->page 	= $search->limit > 0 ? floor($search->index/$search->limit) : 0;
+	
+	// node
+	$node = db_fetch_object($result);
+	if(!$node) { return drupal_not_found(); }
+	$node = node_load($node->nid);
+	$node->search = $search;
+	$GLOBALS["node"] = $node;
+	
+	// breadcrumb
+	$breadcrumb = array(
+		l(t('Home'), NULL), 
+		l(t('My account'), 'user'),
+		l(immobilier_favoris_page_title(), $search->path, array('query' => array('page' => $search->page))),
+		$node->title
+	);
+	drupal_set_breadcrumb($breadcrumb);
+	
+	drupal_set_title($node->title);
+	return node_show($node, false);
+}
+
+
+
+/**
+* Titre de la page de consultation du panier
+* @see immobilier_favoris_menu()
+*/
+function immobilier_favoris_page_title() {
+	$flag = flag_get_flag("immobilier_favoris");
+	if($flag) { return $flag->title; }	
+	return 'Panier de sélection';
+}
+
+/**
+* Conditions d'accès à la page de sélection
+* @see immobilier_favoris_page()
+*/
+function immobilier_favoris_page_access($account) {
+	if(!$GLOBALS['user']->uid && !$account->uid) 
+		return true;
+	return user_view_access($account);
+}
+
+/**
+* Formulaire de settings globales du site
+* @see immobilier_favoris_menu()
+*/
+function immobilier_favoris_settings_form() {
+	$form = null;
+	return system_settings_form($form);
+
+}
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+ 
+/**
+* Récupère la liste des flags d'un utilisateur
+* @see immobilier_favoris_menu()
+*/
+function immobilier_favoris_get_user_flags($account = null, $key = "content_id") {
+	
+	// si aucun compte spécifié, utilisateur en cours.
+	if(!$account) 
+		$account = $GLOBALS['user'];
+
+	$allflags = flag_get_user_flags("node", null, $account->uid);
+	$flags = (array)$allflags["immobilier_favoris"];
+	
+	if($key) 
+		array_walk($flags,  create_function('&$o', '$o = @$o->'.$key.';'));
+	
+	return $flags;
+}

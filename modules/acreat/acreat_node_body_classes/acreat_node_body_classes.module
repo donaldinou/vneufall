@@ -1,0 +1,48 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * hook_preprocess_page() 
+ */
+function acreat_node_body_classes_preprocess_page(&$variables) {
+	$body_classes = $variables['body_classes'];
+	$new_body_classes = $variables['node']->body_classes;
+	if (isset($variables['node']) && !empty($new_body_classes))
+		$variables['body_classes'] = trim("$body_classes $new_body_classes");
+}
+
+/**
+ * hook_schema_alter() 
+ */
+function acreat_node_body_classes_schema_alter(&$schema) {
+	$schema["node"]["fields"]["body_classes"] = array(
+		'description' => 'Champs texte permettant de spécifier des classes css spécifique pour la balise BODY',
+		'type' => 'varchar',
+		'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+	);
+}
+
+/**
+ * hook_form_alter() 
+ */
+function acreat_node_body_classes_form_alter(&$form, $form_state, $form_id) {
+	if(preg_match("/_node_form$/", $form_id)) {
+		$body_classes = $form["#node"]->body_classes;
+		$form["layout"] = array(
+			"#type" => "fieldset",
+			"#collapsed" => empty($body_classes),
+			"#title" => "Paramètres de mise en page",
+			"#collapsible" => true,
+			"body_classes" => array(
+				'#type' => 'textfield',
+				'#title' => "Classe(s) BODY",
+				'#default_value' => $body_classes
+			)
+		);
+	}
+}

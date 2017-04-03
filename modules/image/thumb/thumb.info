@@ -1,0 +1,10 @@
+; $Id: thumb.info,v 1.1 2008/11/24 09:28:45 davyvandenbremt Exp $
+name = Thumb
+description = Generate thumbnails.
+core = 6.x
+; Information added by drupal.org packaging script on 2008-11-24
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "thumb"
+datestamp = "1227528886"
+

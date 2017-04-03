@@ -1,0 +1,8 @@
+; 
+name = Favoris
+description = Les visiteurs peuvent maintenir une sélection d'annonces immobilère
+package = Immobilier
+dependencies[] = immobilier
+dependencies[] = flag
+dependencies[] = session_api
+core = "6.x"

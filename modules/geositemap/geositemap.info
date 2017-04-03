@@ -1,0 +1,6 @@
+; 
+name = Geositemap
+description = Génération d'un sitemap géographique automatique
+package = Acreat
+dependencies[] = acreat
+core = "6.x"

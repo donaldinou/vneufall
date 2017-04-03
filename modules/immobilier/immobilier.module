@@ -1,0 +1,2067 @@
+<?php
+// $Id: immobilier.module,v 1.0 2009/09/08 11:30:00$
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation de hook_init
+ */
+function immobilier_init() {
+	// Add the CSS for this module.
+	drupal_add_css(drupal_get_path('module', 'immobilier') .'/immobilier.css', 'module');
+}
+
+/**
+ * Implementation de hook_menu
+ */
+function immobilier_menu() {
+	$items = array();
+	$types = immobilier_get_types();
+	
+	foreach($types as $type) {
+		$items[$type->type] = array(
+			'title' => $type->name,
+			'page callback' => 'drupal_get_form',
+			'page arguments' => array('immobilier_search_form_' . $type->type),
+			'access arguments' => array('access content'),
+			'type' => MENU_SUGGESTED_ITEM,
+			'menu_name' => 'primary-links'
+		);
+
+		// Resultats de recherche
+		$items[$type->type.'/search/%immobilier_search_params'] = array(
+			'title' => 'Résultats de votre recherche',
+			'page callback' => 'immobilier_search_page',
+			'page arguments' => array(0,2),
+			'access arguments' => array('access content'),
+			'type' => MENU_CALLBACK,
+			'menu_name' => 'primary-links',
+			'file' => 'immobilier.pages.inc'
+		);
+		
+		// Résultats XML
+		$items[$type->type.'/search/%immobilier_search_params/gxml'] = array(
+			'page callback' => 'immobilier_search_gxml',
+			'page arguments' => array(0,2),
+			'access arguments' => array('access content'),
+			'type' => MENU_CALLBACK,
+			'file' => 'immobilier.pages.inc'
+		);
+		
+		// Résultats RSS
+		$items[$type->type.'/search/%immobilier_search_params/rss'] = array(
+			'title' => 'Fil RSS de votre recherche',
+			'page callback' => 'immobilier_search_feed',
+			'page arguments' => array(0,2),
+			'access arguments' => array('access content'),
+			'type' => MENU_CALLBACK,
+			'file' => 'immobilier.pages.inc'
+		);
+		
+		// Détail d'un de recherche
+		$items[$type->type.'/search/%immobilier_search_params/detail'] = array(
+			'title' => 'Résultats de votre recherche',
+			'page callback' => 'immobilier_search_detail_page',
+			'page arguments' => array(0,2),
+			'access arguments' => array('access content'),
+			'type' => MENU_CALLBACK,
+			'menu_name' => 'primary-links',
+			'file' => 'immobilier.pages.inc'
+		);
+	}
+	
+	// Export XML pour Vitelogé
+	$items['immobilier/export/viteloge.xml'] = array(
+		'title' => 'Export Vitelogé',
+		'page callback' => 'immobilier_export_viteloge',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+		'file' => 'immobilier.pages.inc'
+	);
+	
+	// AJAX
+	$items['immobilier/ajax/secteurs'] = array(
+		'title' => 'Liste des secteurs',
+		'page callback' => 'immobilier_ajax_secteurs',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK
+	);
+	
+	// ADMINISTRATION
+	$items['admin/immobilier'] = array(
+		'title' 			=> 'Immobilier',
+		'description' 		=> 'Administration du module immobilier',
+		'page callback' 	=> 'system_admin_menu_block_page',
+		'access arguments' 	=> array('access administration pages'),
+		'file'				=> 'system.admin.inc',
+		'file path'			=> drupal_get_path('module', 'system')	
+	);
+	
+	$items['admin/immobilier/node'] = array(
+		'title' 			=> 'Annonces',
+		'description' 		=> 'Liste des annonces immobilières',
+		'page callback' 	=> 'system_admin_menu_block_page',
+		'access arguments' 	=> array('access administration pages'),
+		'file'				=> 'system.admin.inc',
+		'file path'			=> drupal_get_path('module', 'system')	
+	);
+
+	foreach($types as $type) {
+		$items['admin/immobilier/node/'.$type->type] = array(
+			'title' 			=> $type->name,
+			'title callback' 	=> 'check_plain',
+			'page callback' 	=> 'immobilier_admin_node_list',
+			'page arguments' 	=> array(3),
+			'access arguments' 	=> array('access administration pages'),
+			'file' 				=> 'immobilier.admin.inc'
+		);
+	
+		/*$items['admin/immobilier/node/'.$type->type.'/overview'] = array(
+			'title' => 'Liste',
+			'type' => MENU_DEFAULT_LOCAL_TASK,
+			'weight' => -10,
+		);*/
+	}
+	
+	$items['admin/immobilier/settings'] = array(
+		'title' 			=> 'Paramètres',
+		'description' 		=> 'Paramètres du module immobilier',
+		'page callback' 	=> 'drupal_get_form',
+		'page arguments' 	=> array('immobilier_admin_settings_form'),
+		'access arguments' 	=> array('access administration pages'),
+		'file' 				=> 'immobilier.admin.inc',
+		'weight'			=> 99,
+	);
+	// Autocomplétion du champ ville dans le formulaire d'édition d'un bien immobilier
+	$items['admin/immobilier/ajax/ville'] = array(
+		'title' 			=> 'Autocomplétion du champ Ville',
+		'page callback' 	=> 'immobilier_admin_ville_autocomplete',
+		'access arguments' 	=> array('access administration pages'),
+		'type' 			 	=> MENU_CALLBACK,
+		'weight'			=> 99,
+		'file' 				=> 'immobilier.admin.inc'
+	);
+	
+	return $items;
+}
+
+/**
+* Implementation de hook_node_info
+* @see hook_node_info
+*/
+function immobilier_node_info() {
+	$node_info = array();
+	$types = immobilier_get_types();
+	foreach($types as $type) {
+		$node_info[$type->type] = array(
+			'name' 			=> $type->name,
+			'module' 		=> 'immobilier',
+			'description'	=> 'Annonce de bien immobilier : '.$type->name,
+			'title_label' 	=> 'Accroche',
+			'body_label'	=> 'Description',
+			'has_body' 		=> TRUE,
+			'has_title' 	=> TRUE			
+		);	
+	}
+	return $node_info;
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function immobilier_perm() {
+	$perms = array();
+	foreach (immobilier_get_types() as $type) {
+		$name = check_plain($type->type);
+		$perms[] = 'create immobilier '. $name;
+		$perms[] = 'delete own immobilier '. $name;
+		$perms[] = 'delete any immobilier '. $name;
+		$perms[] = 'edit own immobilier '. $name;
+		$perms[] = 'edit any immobilier '. $name;
+	}
+	return $perms;
+}
+  
+/**
+* Implementation de hook_access
+* @see hook_access
+*/
+function immobilier_access($op, $node, $account) {
+	$type = is_string($node) ? $node : (is_array($node) ? $node['type'] : $node->type);
+	
+	if ($op == 'create') {
+		return user_access('create immobilier '. $type, $account);
+	}
+
+	if ($op == 'update') {
+		if (user_access('edit any immobilier '. $type, $account) || (user_access('edit own immobilier '. $type, $account) && ($account->uid == $node->uid))) {
+		  return TRUE;
+		}
+	}
+
+	if ($op == 'delete') {
+		if (user_access('delete any immobilier '. $type, $account) || (user_access('delete own immobilier '. $type, $account) && ($account->uid == $node->uid))) {
+		  return TRUE;
+		}
+	}
+}
+
+/**
+* Implementation de hook_form
+* @see hook_form
+*/
+function immobilier_form(&$node) {
+	drupal_add_js(drupal_get_path("module", "immobilier")."/js/immobilier.form.js");
+	
+	$type = node_get_types('type', $node);
+
+	$form['#validate'][] = 'immobilier_form_validate';
+	$form['#submit'][] 	 = 'immobilier_form_submit';
+
+	if ($type->has_title) {
+		$form['title'] = array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => check_plain($type->title_label),
+			'#required' 	 => TRUE,
+			'#default_value' => $node->title,
+			'#weight' 		 => -6,
+		);
+	}
+
+	$form['reference'] = array(
+		'#type' 		 => 'textfield',
+		'#title' 		 => 'Référence',
+		'#default_value' => $node->reference,
+		'#required' 	 => TRUE,
+		'#weight' 		 => -5,
+	);
+	
+	// agence
+	$agences = immobilier_get_agences("nom");
+	if(count($agences)) {
+		$form['aid'] = array(
+			'#type' 		 => 'select',
+			'#title' 		 => 'Agence',
+			'#default_value' => $node->aid,
+			'#required' 	 => TRUE,
+			'#options'		 => $agences,
+			'#weight' 		 => -4,
+		);
+	}
+	
+	$weight = 0;
+	
+	// BODY
+	if ($type->has_body) {
+		$form['body_field'] = node_body_field($node, $type->body_label, $type->min_word_count);
+		$form['body_field']["#weight"] = $weight++;
+	}
+	
+	$form["details"] = array(
+		"#type" 		=> "fieldset",
+		"#title" 		=> "Détails",
+		"#theme" 		=> "immobilier_form_fieldset",
+		"#collapsible" 	=> true,
+		"#weight" 		 => $weight++,
+		// ---
+		"pieces" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Nombre de pièces',
+			'#default_value' => $node->pieces,
+			'#size' 		 => 5,
+			'#required' 	 => FALSE,
+		),
+		// ---
+		"chambres" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Nombre de chambres',
+			'#default_value' => $node->chambres,
+			'#size' 		 => 5,
+			'#required' 	 => FALSE,
+		),
+		// ---	
+		"sallesdeb" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Nombre de salles de bain',
+			'#default_value' => $node->sallesdeb,
+			'#size' 		 => 5,
+			'#required' 	 => FALSE,
+		),
+		// ---	
+		"exclusif" => array(
+			"#type" 		 => "checkbox",
+			"#title" 		 => "Exclusivité",
+			"#default_value" => $node->exclusif
+		),
+		// ---	
+		"surface" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Surface habitable',
+			'#default_value' => $node->surface,
+			'#size' 		 => 5,
+			'#required' 	 => FALSE,
+			"#field_suffix"	 => "m&sup2;"
+		),
+		// ---	
+		"surface_sejour" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Surface séjour',
+			'#size' 		 => 5,
+			'#default_value' => $node->surface_sejour,
+			'#required' 	 => FALSE,
+			"#field_suffix"	 => "m&sup2;"
+		),
+		// ---
+		"terrain" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Surface du terrain',
+			'#size' 		 => 5,
+			'#default_value' => $node->terrain,
+			'#required' 	 => FALSE,
+			"#field_suffix"	 => "m&sup2;"
+		)
+		// ---
+	);
+	
+	$form["dpe"] = array(
+		"#type" => "fieldset",
+		"#title" => "Diagnostic de Performance énergétique",
+		"#theme" => "immobilier_form_fieldset",
+		"#description" => "La loi Grenelle 2 du 12 juillet 2010 rend obligatoire à compter du 1er janvier 2011 l’affichage du classement énergétique des biens résultant du diagnostic de performance énergétique (DPE) dans toutes les annonces immobilières de vente et de location, quelle que soit l’affectation du bien.",
+		"#collapsible" => true,
+		"#weight" 		 => $weight++,
+		// ---
+		"dpe_conso" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Consommation énergétique',
+			'#field_suffix'  => "kWh<sub>EP</sub>/m².an",
+			'#default_value' => $node->dpe_conso,
+			'#required' 	 => FALSE,
+			'#size' 		 => 5,
+			'#attributes'	 => array(
+				'onchange' => '$("#edit-dpe-note").val(window.dpe_note($(this).val()))'
+			)
+		),
+		// ---
+		"dpe_note" => array(
+			'#type' 		 => 'select',
+			'#title' 		 => 'Note énergétique',
+			'#options'		 => array(''=>'','A'=>'A','B'=>'B','C'=>'C','D'=>'D','E'=>'E','F'=>'F','G'=>'G'),
+			'#default_value' => $node->dpe_note,
+			'#required' 	 => FALSE
+		),
+		// ---
+		"ges_emiss" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Emissions GES',
+			'#field_suffix'  => "kg <small>eq</small> CO<sub>2</sub>/m².an",
+			'#default_value' => $node->ges_emiss,
+			'#required' 	 => FALSE,
+			'#size' 		 => 5,
+			'#attributes'	 => array(
+				'onchange' => '$("#edit-ges-note").val(window.ges_note($(this).val()))'
+			)
+		),
+		// ---
+		"ges_note" => array(
+			'#type' 		 => 'select',
+			'#title' 		 => 'Note GES',
+			'#options'		 => array(''=>'','A'=>'A','B'=>'B','C'=>'C','D'=>'D','E'=>'E','F'=>'F','G'=>'G'),
+			'#default_value' => $node->ges_note,
+			'#required' 	 => FALSE
+		),
+		// ---
+	);
+	
+	$form["divers"] = array(
+		"#type" => "fieldset",
+		"#title" => "Informations diverses",
+		"#theme" => "immobilier_form_fieldset",
+		"#collapsible" => true,
+		"#weight" 		 => $weight++,
+		// ---
+		"chauffage" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Chauffage',
+			'#default_value' => $node->chauffage,
+			'#required' 	 => FALSE,
+			'#size' 		 => 30
+		),
+		// ---
+		"exposition" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Exposition',
+			'#default_value' => $node->exposition,
+			'#required' 	 => FALSE,
+			'#size' 		 => 30
+		),
+		// ---
+		"annee" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Annee',
+			'#default_value' => $node->annee,
+			'#required' 	 => FALSE,
+			'#size' 		 => 5
+		),
+		// ---
+		"niveau" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Nombre de niveaux',
+			'#default_value' => $node->niveau,
+			'#required' 	 => FALSE,
+			'#size' 		 => 5
+		),
+		// ---
+		"etage" => array(
+			'#type' 		 => 'textfield',
+			'#title' 		 => 'Etage',
+			'#default_value' => $node->etage,
+			'#required' 	 => FALSE,
+			'#size' 		 => 5
+		),
+		// ---
+		"disponibilite" => array(
+			'#type' 		 => module_exists('date_popup') ? 'date_popup' : 'date',
+			'#title' 		 => 'Disponibilité',
+			'#default_value' => $node->disponibilite,
+			'#date_format'	 => 'd/m/Y',
+			'#required' 	 => FALSE
+		)
+	);
+	
+	// Caractéristiques
+	$form["caracteristiques"] = array(
+		"#type" => "textarea",
+		"#title" => "Caractéristiques",
+		"#weight" => $weight++,
+		"#rows" => 5,
+		"#description" => "Une caractéristique par ligne",
+		"#default_value" => $node->caracteristiques,
+	);
+
+	// Visite virtuelle
+	$form["url_visite"] = array(
+		'#type' 		 => 'textfield',
+		'#title' 		 => 'Visite virtuelle',
+		'#default_value' => $node->url_visite,
+		'#required' 	 => FALSE,
+		"#weight" => $weight++
+	);
+		
+	// Informations financières
+	$form["finance"] = array(
+		"#type" => "fieldset",
+		"#title" => "Informations financières",
+		"#weight" => $weight++,
+		"#theme" => "immobilier_form_fieldset",
+		"#collapsible" => true,
+		// ---
+		"prix" => array(
+			"#type" 		 => "textfield",
+			"#title" 		 => "Prix",
+			"#default_value" => $node->prix,
+			"#field_suffix"	 => "&euro;",
+			'#size' 		 => 10
+		),
+		// ---
+		"charges" => array(
+			"#type" 		 => "textfield",
+			"#title" 		 => "Charges",
+			"#default_value" => $node->charges,
+			"#field_suffix"	 => "&euro; / mois",
+			'#size' 		 => 5
+		),
+		// ---
+		"honoraires" => array(
+			"#type" 		 => "textfield",
+			"#title" 		 => "Honoraires",
+			"#default_value" => $node->honoraires,
+			"#field_suffix"	 => "&euro;",
+			'#size' 		 => 5
+		),
+		// ---
+		"depot_garantie" => array(
+			"#type" 		 => "textfield",
+			"#title" 		 => "Dépôt de garantie",
+			"#default_value" => $node->depot_garantie,
+			"#field_suffix"	 => "&euro;",
+			'#size' 		 => 5
+		)
+	);
+		
+	// Localisation
+	$form["localisation"] = array(
+		"#type" => "fieldset",
+		"#title" => "Localisation",
+		"#theme" => "immobilier_form_fieldset_localisation",
+		"#weight" => $weight++,
+		"#collapsible" => true,
+		// -- adresse
+		"adresse" => array(
+			"#type" => "textarea",
+			"#title" => "Adresse",
+			"#default_value" => $node->adresse,
+			"#rows"	=> 2
+		),
+		"code_postal" => array(
+			"#type" => "textfield",
+			"#title" => "Code Postal",
+			"#default_value" => $node->code_postal,
+			"#size"	=> 5
+		),
+		"ville" => array(
+			'#type' 		 	=> 'textfield',
+			'#title' 		 	=> 'Ville',
+			'#default_value' 	=> $node->ville,
+			'#required' 	 	=> FALSE,
+			'#autocomplete_path'=> 'admin/immobilier/ajax/ville'
+		),
+		"latitude" => array(
+			"#type" => "hidden",
+			"#default_value" => $node->latitude,
+			"#title" => "Latitude"
+		),
+		"longitude" => array(
+			"#type" => "hidden",
+			"#default_value" => $node->longitude,
+			"#title" => "Longitude"
+		)
+	);
+	
+	// VISUELS
+	$cck_field = immobilier_variable_get("images_cck_field", 0);
+	if($cck_field) 
+	{
+		if($node->medias->image) {
+			$images = array();
+			foreach($node->medias->image as $image)
+				$images[] = (array)$image;
+			$node->$cck_field = $images;
+		}
+		$form["#node"] = $node;
+		module_load_include('inc', 'content', 'includes/content.node_form');
+		$field = content_fields($cck_field);
+		$field = (array) content_field_form($form, $form_state, $field);
+		$form += $field;
+		
+		// redéfinition des validation
+		foreach(element_children($form[$cck_field]) as $key) 
+			$form[$cck_field][$key]['#element_validate'] = array('imagefield_widget_validate');
+			
+		// placement de l'élément de formulaire
+		$form[$cck_field]["#weight"] = $weight++;
+	}
+	// ---
+
+	// intervention du module spécifique
+	immobilier_invoke($node, 'form', &$form, &$node, &$form_state);
+	
+	return $form;
+}
+
+
+/**
+* Implementation de immobilier_form_validate
+* @see immobilier_form
+*/
+function immobilier_form_validate(&$form, &$form_state) {
+	$values = $form_state["values"];
+	$node = db_fetch_object(db_query("SELECT nid, title FROM immo_annonce WHERE reference = '%s'", $values["reference"]));
+	if($node && $values["nid"] != $node->nid) 
+		form_set_error("reference", sprintf("La référence <em>%s</em> est déjà attribué à l'annonce <em>%s</em> !", $values["reference"], l($node->title, "node/".$node->nid, array("attributes" => array("target" => "_blank")))));
+}
+
+/**
+* Implementation de hook_form_alter
+* @see hook_form_alter
+*/
+function immobilier_form_alter(&$form, &$form_state, $form_id) {
+
+	if(preg_match("/^(\w+)_node_form$/", $form_id, $matches) && immobilier_get_types("type", "location")) {
+		
+		// categorie
+		//$categories_vid = immobilier_variable_get('categories_vid');
+		//$form["taxonomy[".$categories_vid."]"] = $form["taxonomy"][$categories_vid];
+		//unset($form["taxonomy"][$categories_vid]);
+		
+		// secteur
+		$secteurs_vid = immobilier_variable_get('secteurs_vid');
+		$form["localisation"]["taxonomy"] = array(
+			"#tree" => true,
+			$secteurs_vid => $form["taxonomy"][$secteurs_vid]
+		);
+		unset($form["taxonomy"][$secteurs_vid]);
+		
+		// si la taxonomy est vide, on retire l'élément
+		if(!count(element_children($form["taxonomy"])))
+			unset($form["taxonomy"]);
+			
+	}
+}
+
+/**
+* Implementation de hook_load
+* @see hook_load
+*/
+function immobilier_load($node) {
+	// unpack
+	$node = drupal_unpack($node);
+	
+	// annonce
+	$where = sprintf("annonce.vid = %d", $node->vid);
+	$additions = db_fetch_object(db_query(immobilier_annonce_sql($where)));
+	
+	// drupal_unpack
+	if($additions->data)
+		$additions->data = unserialize($additions->data);
+		
+	//agence
+	$rs = db_query('SELECT * FROM {immo_agence} agence WHERE agence.aid = %d', $additions->aid);
+	$additions->agence = db_fetch_object($rs);
+	
+	// fichiers
+	$additions->medias = new stdClass();
+	$rs = db_query('SELECT * FROM {immo_files} files LEFT JOIN {files} f ON f.fid = files.fid WHERE files.vid = %d ORDER BY files.weight', $node->vid);
+	while($file = db_fetch_object($rs)) {
+		$type = $file->type;
+		if(!isset($additions->medias->$type))
+			$additions->medias->$type = array();
+		array_push($additions->medias->$type, $file);	
+	}
+	$additions->files = $additions->medias;
+
+	return $additions;
+}
+
+/**
+* Sauvegarde d'un node
+* @see immobilier_insert
+* @see immobilier_update
+*/
+function immobilier_save($node, $update = 'vid') {
+
+	//db_query("INSERT INTO {immo_annonce} (nid, pieces) VALUES (%d, %d)", $node->nid, $node->pieces);
+	//$node->categorie_tid
+	
+	// categorie
+	$vid = immobilier_variable_get('categories_vid');
+	if(isset($node->taxonomy[$vid]))
+		$node->categorie_tid = (int)$node->taxonomy[$vid];
+	
+	// secteur
+	$vid = immobilier_variable_get('secteurs_vid');
+	if(isset($node->taxonomy[$vid]))
+		$node->secteur_tid = (int)$node->taxonomy[$vid];
+	
+	//serialize data informations
+	if(isset($node->data))
+		$node->data = $node->data ? serialize($node->data) : null;
+
+	// disponibilite
+	if(isset($node->disponibilite) && is_array($node->disponibilite))
+		$node->disponibilite = sprintf("%d-%d-%d", $node->disponibilite["year"], $node->disponibilite["month"], $node->disponibilite["day"]);
+
+	// enregistrement du node
+	$return = drupal_write_record("immo_annonce", $node, $update ? $update : array());
+	if($update && !db_affected_rows())
+		$return = drupal_write_record("immo_annonce", $node);
+	
+	// images
+	$cck_field = immobilier_variable_get("images_cck_field", 0);
+	if($cck_field && $node->$cck_field) 
+	{	
+		$filepaths = array();
+		
+		foreach($node->$cck_field as $file) {
+			if(is_array($file) && !empty($file['fid']) && !empty($file['filepath'])) {
+				$filepaths[$file['_weight']] = $file['filepath'];
+				// suppression de l'ancienne miniature d'admin en cas de nouvelle photo
+				if(!preg_match("/^".preg_quote(file_create_path(), "/")."\/immobilier/", $file['filepath']))
+					file_delete(imagefield_file_admin_thumb_path($file, FALSE));
+			}
+		}
+		ksort($filepaths);
+		$filepaths = array_merge($filepaths, array());
+
+		include_once drupal_get_path('module', 'immobilier').'/immobilier.import.inc';
+		immobilier_files_replace($filepaths, $node->nid, 'image');
+	}
+	
+	//print_pre($node);
+	return $return;
+}
+
+/**
+* Implementation de hook_insert
+* @see hook_insert
+* @see immobilier_save
+*/
+function immobilier_insert($node) {
+	immobilier_save($node);
+}
+
+
+/**
+* Implementation de hook_update
+* @see hook_update
+* @see immobilier_save
+*/
+function immobilier_update($node) {
+	if ($node->revision) 
+		immobilier_save($node, false);
+	else
+		immobilier_save($node, 'vid');
+}
+
+/**
+* Implementation de hook_delete
+* @see hook_delete
+*/
+function immobilier_delete(&$node) {
+	db_query('DELETE FROM {immo_annonce} WHERE nid = %d', $node->nid);
+	immobilier_file_delete_all($node);
+}
+
+/**
+* Implementation de hook_view
+* @see hook_view
+*/
+function immobilier_view(&$node, $teaser = FALSE, $page = FALSE) {
+	if(!$page) { return $node; }
+	
+	$node = node_prepare($node, $teaser);
+
+	if($node->picture) {
+		$node->content['picture'] = array(
+			'#type' => "item",
+			'#title' => "Photo",
+			'#value' => theme("image", $node->picture)
+		);
+	}
+	$node->content['reference'] = array(
+		'#type' => "item",
+		'#title' => "Référence",
+		'#value' => $node->reference
+	);
+	
+	$node->content['categorie'] = array(
+		'#type' => "item",
+		'#title' => "Catégorie",
+		'#value' => $node->categorie
+	);
+	
+	if($node->pieces) {
+		$node->content['pieces'] = array(
+			'#type' => "item",
+			'#title' => "Nombre de pièces",
+			'#value' => $node->pieces
+		);
+	}
+	
+	if($node->chambres) {
+		$node->content['chambres'] = array(
+			'#type' => "item",
+			'#title' => "Nombre de chambres",
+			'#value' => $node->chambres
+		);
+	}
+	
+	if($node->ville) {
+		$node->content['ville'] = array(
+			'#type' => "item",
+			'#title' => "Ville",
+			'#value' => $node->ville
+		);
+	}
+	
+	if($node->surface) {
+		$node->content['surface'] = array(
+			'#type' => "item",
+			'#title' => "Surface",
+			'#value' => $node->surface
+		);
+	}
+	
+	if($node->surface_sejour) {
+		$node->content['surface_sejour'] = array(
+			'#type' => "item",
+			'#title' => "Surface séjour",
+			'#value' => $node->surface_sejour
+		);
+	}
+	
+	if($node->terrain) {
+		$node->content['terrain'] = array(
+			'#type' => "item",
+			'#title' => "Surface du terrain",
+			'#value' => $node->terrain
+		);
+	}
+	
+	$node->content['secteur'] = array(
+		'#type' => "item",
+		'#title' => "Secteur",
+		'#value' => $node->secteur
+	);
+	
+	$node->content['prix'] = array(
+		'#type' => "item",
+		'#title' => "Prix",
+		'#value' => $node->prix
+	);
+	
+	$node->content['disponibilite'] = array(
+		'#type' => "item",
+		'#title' => "Date de disponibilité",
+		'#value' => $node->disponibilite
+	);
+	
+	// intervention du module spécifique
+	immobilier_invoke($node, 'view', &$node, $teaser, $page);
+	//if ($_node = immobilier_invoke($node, 'view', $node, $teaser, $page)) {
+	//	$node = $_node;
+	//}
+	
+	return $node;
+}
+
+/**
+ * Implementation de hook_theme
+ */
+function immobilier_theme() {
+	return array(
+		'immobilier_search' => array(
+		  'arguments' => array('nodes' => NULL,'search' => NULL),
+		  'template' => 'immobilier-search'
+		),
+		'immobilier_search_node' => array(
+		  'arguments' => array('node' => false,'search' => NULL),
+		  'template' => 'immobilier-search-node'
+		),
+		'pager_mini' => array(
+			'arguments' => array('format' => null, 'element' => 0)
+		),
+		'immobilier_form_fieldset' => array(
+			'arguments' => array('form' => null)
+		),
+		'immobilier_form_fieldset_localisation' => array(
+			'arguments' => array('form' => null)
+		)
+	);
+}
+
+/**
+ * Implementation de hook_forms
+ */
+function immobilier_forms() {
+	$forms = array();
+	
+	$forms["immobilier_search_form"] = array('callback' => '_immobilier_search_form');
+	foreach (array_keys(immobilier_get_types()) as $type) {
+		$forms["immobilier_search_form_".$type] = array(
+			'callback' => '_immobilier_search_form',
+			'callback arguments' => array($type)
+		);
+	}
+	return $forms;
+}
+
+/**
+ * Implementation de hook_menu_link_alter
+  * @see menu_link_save
+ */
+function immobilier_menu_link_alter(&$item, $menu) {
+	// Défini le parent des éléments de menu situés dans $type/search/%
+	$types = immobilier_get_types();
+	foreach($types as $type) {
+		if(preg_match("/^".$type->type."\/search\/\%/si",$item["path"]))
+			$item["plid"] = db_result(db_query("SELECT mlid FROM {menu_links} WHERE menu_name = '%s' AND link_path = '%s'", $item['menu_name'], $type->type));
+	}
+}
+
+/**
+ * Implementation de hook_link
+ */
+function immobilier_link($type, $object, $teaser = FALSE) {
+  $links = array();
+  if ($type == 'node' && isset($object->search)) {
+		$links['back_search'] = array(
+		  'title' => 'Revenir aux résultats',
+		  'href' => $object->search->path,
+		  'query' => array('page' => $object->search->page)
+		);
+    
+  }
+
+  return $links;
+}
+
+/**
+* form_alter de "taxonomy_form_term"
+* @see taxonomy_form_term
+ */
+function immobilier_form_taxonomy_form_term_alter(&$form, $form_state) {
+	$vid = $form["#vocabulary"][vid];
+	$tid = $form["#term"][tid];
+	
+	if(!empty($form_state["confirm_delete"])) return;
+	
+	// categorie
+	if($vid == immobilier_variable_get('categories_vid')) {
+		$default_value =array();
+		if($tid) {
+			$rs = db_query("SELECT type FROM {immo_type_categorie} WHERE tid = %d", $tid);
+			while($term = db_fetch_object($rs))
+				$default_value[] = $term->type;
+		}
+		$form["identification"]["types"] = array(
+			'#type' => 'checkboxes', 
+			'#title' => "Types d'annonces", 
+			'#default_value' => $default_value,
+			'#options' => immobilier_get_types("names"),
+			'#description' => "Types d'annonces immobilières qui utilise cette catégorie de bien",
+		);
+	}
+
+	// secteur
+	if($vid == immobilier_variable_get('secteurs_vid')) {
+		$infos = new stdClass();
+		if($tid) 
+			$infos = db_fetch_object(db_query("SELECT * FROM {immo_secteur} WHERE tid = %d", $tid));
+		
+		if($gmap_key = variable_get("google_map_api_key", false)) {
+			// initialisation d'une garte gmap pour la localisation
+			$gmap_latitude = $infos->latitude ? $infos->latitude : '48.111761000000001';
+			$gmap_longitude = $infos->longitude ? $infos->longitude : '-1.6802649999999999';
+			drupal_set_html_head('<script type="text/javascript" src="http://www.google.com/jsapi?key='.$gmap_key.'"></script>');
+			
+			$gmap_init_script = '
+				gmap = new google.maps.Map2(document.getElementById("gmap"));
+				gmap.addControl(new google.maps.SmallZoomControl3D());
+				gmap.enableContinuousZoom();
+				gmap.disableScrollWheelZoom();
+				gmap.setCenter(new google.maps.LatLng('.$gmap_latitude.', '.$gmap_longitude.'), 13);
+				google.maps.Event.addListener(gmap, "move", function() {
+					var center = gmap.getCenter();
+					$("#edit-latitude").val(center.lat());
+					$("#edit-longitude").val(center.lng());
+				});
+				$("#edit-latitude,#edit-longitude").keyup(function() {
+					gmap.setCenter(new google.maps.LatLng($("#edit-latitude").val(),$("#edit-longitude").val()));
+				});
+				
+				gmap.set_default = function() {
+					var search = $("#edit-name").val();
+					var geocoder = new google.maps.ClientGeocoder();
+					geocoder.getLatLng(search,function(point) {
+						gmap.setCenter(point);
+					});
+				}
+			';
+			
+			if($infos->polyline) {
+				$gmap_init_script .= '
+					var gpolygon = new GPolygon.fromEncoded({
+					  polylines: [
+						{points: "'.addslashes($infos->polyline).'",
+							levels: "'.addslashes($infos->levels).'",
+							color: "#2B8BC8",
+							opacity: 0.7
+						}],
+					  fill: true,
+					  color: "#2B8BC8",
+					  opacity: 0.4,
+					  outline: true
+					});
+					gmap.addOverlay(gpolygon);
+				';
+			}
+			
+			drupal_add_js('google.load("maps" , 2, {"language" : "fr"}); $(function() { '.$gmap_init_script.'});', 'inline'); 
+			$form["identification"]["gmap"] = array(
+				'#type' => 'item', 
+				'#value' => '<div id="bd" style="position:relative;width:450px;float:right"><div id="gmap" style="width:100%;height:250px;"></div><div id="crosshair" style="position: absolute;top:116px;height:19px;width:19px;left:50%;margin-left:-9px;display:block;background: url(http://www.getlatlon.com/crosshair.gif);background-position: center center;background-repeat: no-repeat;"></div></div>'
+			);
+		}
+		
+		$form["identification"]["latitude"] = array(
+			'#type' => 'textfield', 
+			'#title' => "Latitude", 
+			'#default_value' => @$infos->latitude,
+			'#description' => "Latitude du point fixe situant le secteur.<br><a href='#' onclick='gmap.set_default(); return false'>Cliquez ici</a> pour déterminer automatiquement les coordonnées.",
+		);
+		$form["identification"]["longitude"] = array(
+			'#type' => 'textfield', 
+			'#title' => "Longitude", 
+			'#default_value' => @$infos->longitude,
+			'#description' => "Longitude du point fixe situant le secteur",
+		);
+		
+		$form["identification"]["polyline"] = array(
+			'#type' => 'textarea', 
+			'#resizable' => false,
+			'#title' => "Encoded Polyline", 
+			'#default_value' => @$infos->polyline,
+			'#description' => "http://code.google.com/apis/maps/documentation/polylineutility.html",
+			'#cols' => 60,
+			'#rows' => 3 
+		);
+		
+		$form["identification"]["levels"] = array(
+			'#type' => 'textfield', 
+			'#title' => "Encoded Levels", 
+			'#default_value' => @$infos->levels,
+			'#description' => "http://code.google.com/apis/maps/documentation/polylineutility.html",
+		);
+		
+	}		
+}
+
+/**
+ * Implementation de hook_taxonomy
+ */
+function immobilier_taxonomy($op, $type, $array = NULL) {
+	$vid = $array[vid];
+	
+	if($type == "term") { 
+		$tid = $array[tid];
+		
+		// categorie
+		if($vid == immobilier_variable_get('categories_vid')) {
+			if( $op == "delete" || isset($array[types]) ) {
+				db_query("DELETE FROM {immo_type_categorie} WHERE tid = %d", $tid);
+				if(isset($array[types])) {
+					foreach(array_filter($array[types]) as $type)
+						db_query("INSERT INTO {immo_type_categorie} (type, tid) VALUES ('%s', %d)", $type, $tid);
+				}
+			}
+		}		
+		
+		// secteurs
+		if($vid == immobilier_variable_get('secteurs_vid')) {
+			if( $op == "delete" || isset($array[latitude]) ) {
+				db_query("DELETE FROM {immo_secteur} WHERE tid = %d", $tid);
+				if(isset($array[latitude])) 
+					db_query("INSERT INTO {immo_secteur} (tid, latitude,longitude,polyline,levels) VALUES ('%s','%s','%s','%s','%s')",$tid,$array[latitude],$array[longitude],$array[polyline],$array[levels]);	
+			}
+		}	
+	}
+}
+
+/**
+ * Implementation de hook_views_api
+ */
+function immobilier_views_api() {
+  return array('api' => 2.0);
+}
+
+/**
+ * Implementation de hook_cron
+ */
+function immobilier_cron() {
+	// coordonnées GPS
+	$count = 0;
+	$rs = db_query("SELECT vid, adresse, code_postal, ville FROM immo_annonce WHERE (latitude IS NULL OR longitude IS NULL OR type_coords NOT IN ('street_address', 'route')) AND adresse > ''");
+	while($annonce = db_fetch_object($rs)) {
+		$search = sprintf("%s, %s %s, FRANCE", $annonce->adresse, $annonce->code_postal, $annonce->ville);
+		$script = drupal_get_path("module", "immobilier")."/scripts/geocoding.pl";
+		$bounds = immobilier_variable_get("geocode_bounds",0);
+		$dpts = array_filter(explode(",",immobilier_variable_get("geocode_departements","")));
+		$cmd = 'perl '.$script.' "'.addslashes($search).'"' . ($bounds ? ' "'.$bounds.'"' : '');
+		$coords = exec($cmd);
+		if($coords) {
+			list($dpt, $type, $latitude, $longitude) = explode(",", $coords);
+			if(count($dpts) && !in_array($dpt, $dpts))
+				continue;
+			db_query("UPDATE immo_annonce SET latitude = %f, longitude = %f, type_coords = '%s' WHERE vid = %d", $latitude, $longitude, $type, $annonce->vid);
+			$count++;
+		}
+	}
+	watchdog("immobilier", "$count coordonnées ont été déterminées automatiquement", array(), WATCHDOG_NOTICE);
+	
+	// secteurs
+	$secteurs = immobilier_get_secteurs();
+	$parents = array();
+	foreach($secteurs as $secteur) 
+		$parents[] = $secteur->parent;
+	$parents = array_unique(array_filter($parents));
+	
+	$count = 0;
+	$rs = db_query("SELECT immo_annonce.nid, immo_annonce.vid, reference, latitude, longitude, ville, secteur_tid FROM immo_annonce, node WHERE immo_annonce.vid = node.vid AND ( secteur_tid IS NULL OR secteur_tid = 0".(count($parents) ? " OR secteur_tid = " . join(" OR secteur_tid = ", $parents) : "").")");
+	while($annonce = db_fetch_object($rs)) {
+		$secteur_tid = false;
+		
+		// détermination par la position géographique
+		if($annonce->latitude && $annonce->longitude) {
+			foreach($secteurs as $secteur) {
+				if(!empty($secteur->polyline)) {
+					$script = drupal_get_path("module", "immobilier")."/scripts/point_in_polygon.pl";
+					$cmd = sprintf("perl %s '%s' %f %f", $script, $secteur->polyline, $annonce->latitude, $annonce->longitude);
+					exec($cmd, $output, $return);
+					if(!$return) 
+						$secteur_tid = $secteur->tid;
+				}			
+			}
+		}
+		
+		// utilisation du script d'import pour déterminer le secteur
+		if(!$secteur_tid && $annonce->ville) {
+			include_once(drupal_get_path('module', 'immobilier')."/immobilier.import.inc");
+			$vid = immobilier_variable_get('secteurs_vid');
+			$term = immobilier_get_term($annonce->ville, $vid);
+			if($term)
+				$secteur_tid = $term->tid;
+		
+		}
+		
+		if($secteur_tid) {
+			db_query("UPDATE immo_annonce SET secteur_tid = %d WHERE vid = %d", $secteur_tid, $annonce->vid);
+			db_query('INSERT INTO {term_node} (nid, vid, tid) VALUES (%d, %d, %d)', $annonce->nid, $annonce->vid, $secteur_tid);
+			$count++;
+		} 
+	}
+	watchdog("immobilier", "$count secteur(s) ont été déterminés automatiquement", array(), WATCHDOG_NOTICE);
+}
+
+
+
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+
+/**
+* @see template_preprocess
+*/
+function immobilier_preprocess(&$vars, $hook) {
+	static $hooks = NULL;
+	if(!isset($hooks)) 
+		$hooks = theme_get_registry();
+
+	if( isset($hooks[$hook]["template"]) && preg_match("/^immobilier-(.*)/si", $hooks[$hook]["template"], $matches) && isset($vars["type"]) ) {
+		echo $vars["template_files"][] = "immobilier-".$vars["type"]."-".$matches[1];
+	}
+}
+
+/**
+* @see immobilier_preprocess_node
+*/
+function immobilier_preprocess_node(&$vars) {
+	$node = $vars["node"];
+	if(!$node) return;
+	if($type = immobilier_get_types("type", $node)) {
+		array_splice($vars["template_files"], 1, 0, array(
+			"node-immobilier",
+			"node-immobilier-".$type->type
+		));
+	}
+}
+
+/**
+* @see immobilier_preprocess_page
+*/
+function immobilier_preprocess_page(&$vars) {
+
+	// node
+	if(($node = $vars["node"]) && $type = immobilier_get_types("type", $node)) {
+		// la page contient un node
+		array_splice($vars["template_files"], 1, 0, array(
+			"page-node-immobilier",
+			"page-node-immobilier-".$type->type
+		));
+	}
+	
+	// cas particulier : détail d'une recherche
+	if( menu_get_object("immobilier_search_params", 2) && arg(3) == "detail" ) {
+		$type = arg(0);
+		// ajout d'un template de page "page-x-search-detail"
+		array_splice($vars["template_files"], 3, 0, "page-$type-search-detail");
+		//$vars["template_files"][] = "page-node-immobilier";
+		//$vars["template_files"][] = "page-node-immobilier-".$params->type;
+	}
+}
+
+
+/*******************************************************************************
+ * FORMULAIRES
+ ******************************************************************************/
+
+/**
+* Formulaire de recherch
+* @see immobilier_forms
+* ajout d'un underscore pour ne pas confondre avec implémentation hook_search_form
+*/
+function _immobilier_search_form(&$form_state, $type = false, $values = false) {
+
+	$types = immobilier_get_types("names");
+	
+	if($type && !isset($types[$type])) {
+		trigger_error("Type d'annonce inconnu : " . $type);
+		$type = false;
+	}
+	
+	// Chargement des données de recherche
+	if(!$values) {
+		$values = new stdClass();
+		// si on se trouve sur une page de recherche on peut charger les paramètres
+		if(arg(1) == "search" && arg(2) && $params = menu_get_object("immobilier_search_params", 2))
+			$values = $params;
+		// sinon on se base sur la dernière recherche en session
+		elseif(isset($_SESSION["immobilier_search"][$type]["values"]))
+			$values = $_SESSION["immobilier_search"][$type]["values"];
+	}
+		
+	$form_state["type"] = $type;
+	$form_state["values"] = (array)$values;
+	
+	$form = array(
+		'#submit' 	=> array('immobilier_search_form_submit'),
+		'#validate' => array('immobilier_search_form_validate'),
+		'type'		=> array('#type' => 'hidden', '#value' => $type)
+	);
+	
+	if(!$type) {
+		$form['type'] = array(
+			'#type' => 'select',
+			'#title' => 'Type',
+			'#options' => $types,
+			'#weight' => 0
+		);
+	}
+	
+	// Type de bien
+	$form['categorie'] = array(
+		'#type' => 'checkboxes', 
+		'#title' => 'Catégorie', 
+		'#options' => immobilier_get_categories($type, "name"),
+		'#default_value' => isset($values->categorie) ? (array)$values->categorie : array(),
+		'#weight' => 1
+	);
+	
+	// Type de bien
+	$form['pieces'] = array(
+		'#type' => 'checkboxes', 
+		'#title' => 'Nombre de pièces', 
+		'#options' => array(
+			1 => 1,
+			2 => 2,
+			3 => 3,
+			4 => 4,
+			5 => 5,
+			'6+' => "6+"		
+		),
+		'#default_value' => isset($values->pieces) ? (array)$values->pieces : array(),
+		'#weight' => 2
+	);
+	
+	// Surface
+	$form['surface'] = array(
+		'#type' => 'fieldset', 
+		'#title' => 'Surface',
+		'#weight' => 3,
+		'#tree' => false,
+		'surface_min' => array(
+			'#type' => 'textfield', 
+			'#title' => 'Minimum',
+			'#field_suffix' => 'm²',
+			'#size' => 8,
+			'#default_value' => @$values->surface_min
+		),
+		'surface_max' => array(
+			'#type' => 'textfield', 
+			'#title' => 'Maximum',
+			'#field_suffix' => 'm²',
+			'#size' => 8,
+			'#default_value' => @$values->surface_max
+		)
+	);
+	
+	// budget
+	$form['budget'] = array(
+		'#type' => 'fieldset', 
+		'#title' => 'Budget',
+		'#weight' => 4,
+		'#tree' => false,
+		'budget_min' => array(
+			'#type' => 'textfield', 
+			'#title' => 'Minimum',
+			'#field_suffix' => '&euro;',
+			'#size' => 8,
+			'#default_value' => @$values->budget_min
+		),
+		'budget_max' => array(
+			'#type' => 'textfield', 
+			'#title' => 'Maximum',
+			'#field_suffix' => '&euro;',
+			'#size' => 8,
+			'#default_value' => @$values->budget_max
+		)
+	);
+	
+	// Secteur
+	if($vid = immobilier_variable_get('secteurs_vid')) {
+		$form['secteur'] = taxonomy_form($vid, $values->secteur, $help = NULL, $name = 'taxonomy');
+		$form['secteur']['#weight'] = 5;
+	}
+	
+	// appel des champs spécifique d'un type d'annonce
+	// hook_search_form
+	// hook_search_form_alter
+	if($type) {
+		// Get the node-specific bits.
+		if ($extra = immobilier_invoke($type, 'search_form', $values, $form_state)) 
+			$form = array_merge_recursive($form, $extra);
+		immobilier_invoke($type, 'search_form_alter', &$form, $values, $form_state);
+	}
+	
+	$form['reference'] = array(
+		'#type' 		 => 'textfield',
+		'#title' 		 => 'Référence',
+		'#default_value' => @$values->reference,
+		'#size' => 20,
+	);
+	
+	// Submit
+	$form['submit'] = array(
+		'#type' => 'submit', 
+		'#value' => 'Rechercher',
+		'#weight' => 99
+	);
+	
+	return $form;
+}
+
+/**
+ * validate
+ * @see immobilier_search_form
+ */
+function immobilier_search_form_validate($form, &$form_state) {
+	$form_state["values"] = array_filter_recursive($form_state["values"]);
+}
+
+/**
+ * Formulaire global de recherche de bien
+ * @see immobilier_search_form
+ */
+function immobilier_search_form_submit($form, &$form_state) {
+	$values = (object)$form_state["values"];
+	$type = $values->type;
+	unset($values->type,$values->form_build_id, $values->form_token, $values->form_id, $values->op, $values->submit); 
+	
+	// serialization
+	$serialize = immobilier_search_serialize($values);
+	$unserialize = immobilier_search_unserialize($serialize);
+	$serialize = immobilier_search_serialize($unserialize);
+	
+	if(!$serialize) {
+		return drupal_set_message("Il y a eu une erreur lors du traitement du formulaire.", "error");
+	}
+	
+	// mise en session de la recherche
+	$_SESSION["immobilier_search"][$type]["values"] = $values;
+	
+	// redirection vers la page de résultat
+	$form_state["redirect"] = "$type/search/$serialize";
+	//drupal_goto("$type/search/$serialize");
+}
+
+
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+
+
+/**
+* Chargement du paramètre %immobilier_search_string
+ * @see hook_menu
+ */
+function immobilier_search_params_load($params = "") {
+	if($params == "all") return new stdClass();
+	return immobilier_search_unserialize($params);
+}
+
+/**
+* Liste des secteurs au format JSON
+ * @see hook_menu
+ */
+function immobilier_ajax_secteurs($tid = 0) {
+	$secteurs = immobilier_get_secteurs(false, $tid);
+	$return = array();
+	foreach($secteurs as $secteur)
+		$return[] = (object)array(
+			"tid" => $secteur->tid,
+			"name" => $secteur->name,
+			//"latitude" => $secteur->latitude,
+			//"longitude" => $secteur->longitude,
+			//"polyline" => $secteur->polyline,
+			//"levels" => $secteur->levels
+		);
+	return drupal_json($return);
+}
+
+/* 
+* Load une agence
+*/
+function immobilier_agence_load($aid) {
+	static $agences;
+	if(!isset($agences[$aid])) {
+		$agences[$aid] = false;
+		$sql = "SELECT * FROM {immo_agence} a WHERE a.aid = %d";
+		$rs = db_query($sql, $aid);
+		if($agence = db_fetch_object($rs)) 
+			$agences[$aid] = $agence;
+	}
+	return $agences[$aid];
+} 
+
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+ 
+/**
+* Theme des fieldset du formulaire d'édition des annonces
+ * @see hook_theme
+ */
+function theme_immobilier_form_fieldset($form) {
+	$childs = element_children($form);
+	$output ='<table class="immobilier-fieldset-table"><tr><td>';
+	
+	$limit = ceil(count($childs)/2);
+	foreach($childs as $key) {
+		$output .= drupal_render($form[$key]);
+		if($limit == ++$i)
+			$output .= '</td><td>';
+	}
+	
+	$output .= '</td></tr></table>';
+	return $output;
+}
+
+/**
+* Theme du fieldset de localisation du formulaire d'édition des annonces
+ * @see hook_theme
+ */
+function theme_immobilier_form_fieldset_localisation($form) {
+	$output = '<table class="immobilier-fieldset-table" id="table-localisation"><tr>';
+	$output .= '<td>' . drupal_render($form) . '</td>';
+	$output .= '<td style="width:450px">
+		<div id="bd" style="position:relative;width:100%;"><div id="gmap" style="width:100%;height:230px;"></div><div id="crosshair" style="position: absolute;top:106px;height:19px;width:19px;left:50%;margin-left:-9px;display:block;background: url(http://www.getlatlon.com/crosshair.gif);background-position: center center;background-repeat: no-repeat;"></div></div>
+		<a href="#" onclick="GMmap.set_default(); return false">Déterminer automatiquement les coordonnées</a>
+	</td>';
+	$output .= '</tr></table>';
+	
+	if($gmap_key = variable_get("google_map_api_key", false)) {
+		$gmap_latitude = $form["latitude"]["#default_value"] ? $form["latitude"]["#default_value"] : '48.111761000000001';
+		$gmap_longitude = $form["longitude"]["#default_value"] ? $form["longitude"]["#default_value"] : '-1.6802649999999999';
+		drupal_set_html_head('<script type="text/javascript" src="http://www.google.com/jsapi?key='.$gmap_key.'"></script>');
+		drupal_add_js('google.load("maps" , 2, {"language" : "fr"}); $(function() { GMmap = localisation_gmap_init('.$gmap_latitude.', '.$gmap_longitude.'); });', 'inline'); 
+	}
+	return $output;
+}
+
+
+/**
+* 
+ * @see hook_menu
+ */
+function theme_pager_mini($format = null, $element = 0) {
+	global $pager_page_array, $pager_total;
+	$items = array();
+	
+	// correction pour node breadcrumb
+	$old = $_GET["q"];
+	$_GET["q"] = $GLOBALS["q"];
+	
+	if($pager_total[$element] > 1) {
+		if($li_previous = theme('pager_previous', t('Previous'), null, $element)) {
+			$items[] = array(
+				'class' => 'pager-mini-previous',
+				'data' => $li_previous,
+			);
+		} else {
+			$items[] = array(
+				'class' => 'pager-mini-previous disabled',
+				'data' => '',
+			);
+		}
+		
+		$items[] = array(
+			'class' => 'pager-mini-label',
+			'data' => t($format ? $format : 'Page @current sur @total', array('@current' => $pager_page_array[$element] + 1, '@total' => $pager_total[$element])),
+		);
+		
+		if($li_next = theme('pager_next', t('Next'), null, $element)) {
+			$items[] = array(
+				'class' => 'pager-mini-next',
+				'data' => $li_next,
+			);
+		} else {
+			$items[] = array(
+				'class' => 'pager-mini-next disabled',
+				'data' => '',
+			);
+		}
+	}
+	
+	$_GET["q"] = $old;
+	return theme('item_list', $items, NULL, 'ul', array('class' => 'pager-mini'));
+}
+
+
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+ 
+/* 
+* Renvoi la liste des type d'annonce dans le format spécifié
+*/
+function immobilier_get_types($op = 'types', $node = NULL, $reset = FALSE) {
+	static $_immo_types;
+
+	if ($reset || !isset($_immo_types)) {
+		$_immo_types = array();
+		$type_result = db_query(db_rewrite_sql('SELECT t.* FROM {immo_type} t ORDER BY t.type ASC', 't', 'type'));
+		while ($type_object = db_fetch_object($type_result)) {
+			$_immo_types[$type_object->type] = $type_object;
+		}
+	}
+	
+	$_immo_names = array();
+	foreach($_immo_types as $type)
+		$_immo_names[$type->type] = $type->name;
+	
+	if ($node) {
+		if (is_array($node)) {
+			$type = $node['type'];
+		}
+		elseif (is_object($node)) {
+		  $type = $node->type;
+		}
+		elseif (is_string($node)) {
+		  $type = $node;
+		}
+
+		$type = preg_replace("/^immo_/si", "", $type);
+		if (!isset($_immo_types[$type])) {
+		  return FALSE;
+		}
+	}
+
+	switch ($op) {
+		case 'types':
+		  return $_immo_types;
+		case 'type':
+		  return isset($_immo_types[$type]) ? $_immo_types[$type] : FALSE;
+		case 'module':
+		  return isset($_immo_types[$type]->module) ? $_immo_types[$type]->module : FALSE;
+		case 'names':
+		  return $_immo_names;
+		case 'name':
+		  return isset($_immo_names[$type]) ? $_immo_names[$type] : FALSE;
+	}
+}
+
+/* 
+* Invoke un hook de type
+*/
+function immobilier_invoke(&$node, $hook, $a2 = NULL, $a3 = NULL, $a4 = NULL) {
+  if (immobilier_hook($node, $hook)) {
+    $module = immobilier_get_types('module', $node);
+    $function = $module .'_'. $hook;
+    return ($function($a2, $a3, $a4));
+  }
+}
+
+/**
+ * Determine whether a immobilier hook exists.
+ */
+function immobilier_hook(&$node, $hook) {
+  $module = immobilier_get_types('module', $node);
+  return module_hook($module, $hook);
+}
+
+/* 
+* Renvoi la liste des categories
+*/
+function immobilier_get_categories($type=false, $champ = false) {
+	static $categories;
+	$vid = immobilier_variable_get('categories_vid');
+	
+	$key = $type ? $type : "all";
+	if(!isset($categories[$key])) {
+		$categories[$key] = array();
+		$sql = "SELECT t.* FROM {term_data} t ";
+		if($type)
+			$sql .= "JOIN {immo_type_categorie} tc ON tc.tid = t.tid AND tc.type = '$type' ";
+		$sql .= "WHERE t.vid = %d ORDER BY weight ASC";
+		$rs = db_query($sql, $vid);
+		while($categorie = db_fetch_object($rs))
+			$categories[$key][$categorie->tid] = $categorie;
+	}
+	
+	$return = $categories[$key];
+	if($champ) {
+		foreach($return as $key=>$value)
+			$return[$key] = $value->$champ;
+	}
+	
+	return $return;
+}  
+
+/* 
+* Renvoi la liste des secteurs
+*/
+function immobilier_get_secteurs($champ = false, $parent = null) {
+	static $secteurs;
+	$vid =  immobilier_variable_get('secteurs_vid');
+	
+	if(!isset($secteurs)) {
+		$secteurs = array();
+		$sql = "
+			SELECT 
+				t.*, s.*, h.parent 
+			FROM {term_data} t
+			JOIN {immo_secteur} s ON s.tid = t.tid
+			LEFT JOIN {term_hierarchy} h ON h.tid = t.tid
+			WHERE t.vid = %d ORDER BY weight ASC";
+		$rs = db_query($sql, $vid);
+		while($secteur = db_fetch_object($rs))
+			$secteurs[$secteur->tid] = $secteur;
+	}
+	$return = $secteurs;
+	
+	// si un tid parent a été spécifié, on filtre
+	if(isset($parent)) {
+		foreach($return as $key=>$value) {
+			if($value->parent <> $parent)
+				unset($return[$key]);
+		}
+	}
+	
+	// si un tid parent a été spécifié, on ne renvoi que ce champ
+	if($champ) {
+		foreach($return as $key=>$value)
+			$return[$key] = $value->$champ;
+	}
+	
+	return $return;
+}  
+
+/**
+ * requete sql des annonces
+ */
+function immobilier_annonce_sql($where = false, $order = false, $join = false, $cols = false, $groupby = false) {
+	/* FROM */
+	$_cols = array(
+		"t_categorie.name as categorie",
+		"SUBSTRING(MIN(CONCAT(LPAD(files.weight,10,'0'), f.filepath)),11) as picture",
+		"f.filesize as picture_size",
+		// secteur
+		"t_secteur.name as secteur",
+		"secteur.latitude as secteur_latitude",
+		"secteur.longitude as secteur_longitude",
+		"secteur.polyline as secteur_polyline",
+		"secteur.levels as secteur_levels"
+	);
+	
+	/* JOIN */
+	$_join = array(
+		// node
+		"LEFT JOIN {node} n ON n.vid = annonce.vid",
+		// secteur
+		"LEFT JOIN {term_data} t_secteur ON t_secteur.tid = annonce.secteur_tid",
+		"LEFT JOIN {immo_secteur} secteur ON secteur.tid = t_secteur.tid",
+		// categorie
+		"LEFT JOIN {term_data} t_categorie ON t_categorie.tid = annonce.categorie_tid",
+		// files
+		"LEFT JOIN {immo_files} files ON (files.vid = annonce.vid AND files.type = 'image')",
+		"LEFT JOIN {files} f ON (files.fid = f.fid)"
+	);
+	
+	/* WHERE */
+	$_where = array(/*'n.status = 1'*/);
+	
+	/* ORDER */
+	$_order = array();
+	
+	/* GROUP BY */
+	//$_groupby = array('annonce.vid');
+	$_groupby = array();
+	
+	// modification de la requête par les modules
+	foreach (module_implements('immobilier_sql') as $module) {
+		$r = module_invoke($module, 'immobilier_sql');
+		if($r["join"]) $_join = array_merge($_join, is_array($r["join"]) ? $r["join"] : array($r["join"]));
+		if($r["cols"]) $_cols = array_merge($_cols, is_array($r["cols"]) ? $r["cols"] : array($r["cols"]));
+		if($r["where"]) $_where = array_merge($_where, is_array($r["where"]) ? $r["where"] : array($r["where"]));
+		if($r["order"]) $_order = array_merge($_order, is_array($r["order"]) ? $r["order"] : array($r["order"]));
+		if($r["groupby"]) $_groupby = array_merge($_groupby, is_array($r["groupby"]) ? $r["groupby"] : array($r["groupby"]));
+	}
+	
+	// modification de la requête par les arguments
+	if($join)
+		$_join = array_merge($_join, is_array($join) ? $join : array($join));
+	if($cols)
+		$_cols = array_merge($_cols, is_array($cols) ? $cols : array($cols));
+	if($where)
+		$_where = array_merge($_where, is_array($where) ? $where : array($where));
+	if($order)
+		$_order = array_merge($_order, is_array($order) ? $order : array($order));
+	if($groupby)
+		$_groupby = array_merge($_groupby, is_array($groupby) ? $groupby : array($groupby));
+	
+	// construction de la requête
+	$sql = "SELECT n.*, annonce.*";
+	
+	if($_cols)
+		$sql .= ", ".join(",", $_cols);
+	
+	$sql .= " FROM {immo_annonce} annonce ";
+	
+	if($_join)
+		$sql .= " ".join(" ", $_join)." ";
+		
+	if($_where)
+		$sql .= " WHERE (".join(") AND (", $_where).") ";		
+
+	if($_groupby){
+		$sql .= " GROUP BY ".join(", ", $_groupby);
+	}else{
+		$sql .= " GROUP BY annonce.vid";
+	}
+	
+	if($_order)
+		$sql .= " ORDER BY ".join(",", $_order);
+		
+	if($limit)
+		$sql .= " LIMIT $limit";
+	return db_rewrite_sql($sql, 'annonce', 'vid');
+}
+
+/* 
+* Renvoi la liste des agences
+*/
+function immobilier_get_agences($champ = false) {
+	static $agences;
+	
+	if(!isset($agences)) {
+		$agences = array();
+		$sql = "SELECT * FROM {immo_agence} a ORDER BY weight, nom ASC";
+		$rs = db_query($sql, $vid);
+		while($agence = db_fetch_object($rs))
+			$agences[$agence->aid] = $agence;
+	}
+	
+	$return = $agences;
+	if($champ) {
+		foreach($return as $key=>$value)
+			$return[$key] = $value->$champ;
+	}
+	
+	return $return;
+} 
+
+/**
+ * Fabrique la requete de recherche à partir des 
+ * hook_immobilier_search_sql
+ * @see doc hook_db_rewrite_sql
+ */
+function immobilier_search_sql($type, $params = null, $options = null) {
+	$where = array();
+	$order = array();
+	$join = array();
+	$cols = array();
+	$groupby = array();
+	
+	// --- status
+	$where['status'] = "n.status = 1";
+
+	// --- transaction
+	$where['type'] = sprintf("annonce.type = '%s'", db_escape_string($type));
+
+	// --- categorie 
+	if($categories = $params->categorie)	{
+		$w = array();
+		$categories = array_filter((array)$categories);
+		foreach($categories as $key=>$value) {
+			$w[] = sprintf("annonce.categorie_tid = %d", $value);
+		}
+		if(count($w))
+			$where['categorie'] = join(' OR ', $w);
+	}
+	
+	// --- pieces 
+	if($pieces = $params->pieces)	{
+		$w = array();
+		$pieces = array_filter((array)$pieces);
+		foreach($pieces as $nb) {
+			$op = preg_match("/\+$/", $nb) ? ">=" : "=";
+			$w[] = sprintf("annonce.pieces $op %d", (int)$nb);
+		}
+		if(count($w))
+			$where['pieces'] = join(' OR ', $w);
+	}
+	
+	// --- surfaces
+	if($surface_min = $params->surface_min)	
+		$where['surface_min'] = sprintf("annonce.surface >= %f", number_unformat($surface_min));
+	if($surface_max = $params->surface_max)	
+		$where['surface_max'] = sprintf("annonce.surface <= %f", number_unformat($surface_max));
+	
+	// --- budget
+	if($budget_min = $params->budget_min)	
+		$where['budget_min'] = sprintf("annonce.prix >= %f", number_unformat($budget_min));
+	if($budget_max = $params->budget_max)	
+		$where['budget_max'] = sprintf("annonce.prix <= %f", number_unformat($budget_max));
+		
+	// --- secteur
+	if($secteur = $params->secteur)	{
+		//$tids = array($secteur);		---> ne gère pas la multiplicité des secteurs
+		$tids = (!is_array($secteur)) ? array($secteur) : $secteur;
+		$terms = taxonomy_get_tree(immobilier_variable_get('secteurs_vid'), $secteur);
+		foreach($terms as $term)
+			$tids[] = $term->tid;
+		$where['secteur'] = sprintf("annonce.secteur_tid IN (%s)", join(",", $tids));
+	}
+	
+	// --- reference
+	if($reference = $params->reference)	{
+		$where['reference'] = sprintf("annonce.reference LIKE '%%%s%%'", db_escape_string($reference));
+	}
+	
+	// --- agence
+	if($agence = $params->agence)	{
+		$where['agence'] = sprintf("annonce.aid = %d", $agence);
+	}
+	
+	// --- tri
+	if($params->sort)	{
+		$order['sort'] = $params->sort.($params->order ? " ".$params->order : "");
+	}
+	
+	// personnalisation de la requête
+	// @see _invoke_immobilier_search_sql
+	list($j, $c, $w, $g, $o) = _invoke_immobilier_search_sql($type, $params, $options);
+	if($j) $join[] = $j;
+	if($c) $cols[] = $c;
+	if($w) $where[] = $w;
+	if($g) $groupby[] = $g;
+	if($o) $order[] = $o;
+	
+	// drupal_alter
+	// @see hook_immobilier_search_sql_alter
+	$data = array(
+		"join"=>&$join,
+		"cols"=>&$cols,
+		"where"=>&$where,
+		"groupby"=>&$groupby,
+		"order"=>&$order
+	);
+	drupal_alter("immobilier_search_sql", $data, $type, $params, $options);
+	
+	return immobilier_annonce_sql($where, $order, $join, $cols, $groupby);
+}
+
+/**
+ * Personnalise la requete de recherche grâce aux autres modules
+ */
+function _invoke_immobilier_search_sql($type, $params, $options) {
+
+	$join = array();
+	$cols = array();
+	$where = array();
+	$groupby = array();
+	$order = array();
+	
+	$infos = array();
+	
+	// modification par le module spécifique
+	$result = immobilier_invoke($type, 'search_sql', $params);
+	if (isset($result) && is_array($result)) 
+		$infos = $result;
+	
+	// modification par les autres modules
+	foreach (module_implements('immobilier_search_sql') as $module) {
+		$result = module_invoke($module, 'immobilier_search_sql', $type, $params);
+		if (isset($result) && is_array($result))  {
+			$infos = array_merge_recursive($infos, $result);
+		}
+	}
+	
+	// modification par les options ponctuelles
+	if(!empty($options))
+		$infos = array_merge_recursive($infos, $options);
+
+	if (isset($infos['join'])) 
+		$join = $infos['join'];
+		
+	if (isset($infos['cols'])) 
+		$cols = $infos['cols'];
+		
+	if (isset($infos['where'])) 
+		$where = $infos['where'];
+
+	if (isset($infos['groupby'])) 
+		$groupby = $infos['groupby'];
+
+	if (isset($infos['order'])) 
+		$order = $infos['order'];
+	
+	$join = empty($join) ? '' : (is_array($join) ? implode(' ', $join) : $join);
+	$cols = empty($cols) ? '' : (is_array($cols) ? implode(', ', $cols) : $cols);
+	$where = empty($where) ? '' : (is_array($where) ? '('. implode(') AND (', $where) .')' : $where);
+	$groupby = empty($groupby) ? '' : (is_array($groupby) ? implode(',', $groupby) : $groupby);
+	$order = empty($order) ? '' : (is_array($order) ? implode(',', $order) : $order);
+
+	return array($join, $cols, $where, $groupby, $order);
+}
+
+
+/**
+ * Serialize les paramètres de recherche
+ */
+function immobilier_search_serialize($params = array()) {
+	$params = (object)array_filter_recursive((array)$params);
+	$base64 = base64_encode(serialize($params));
+	$base64 = preg_replace("/=+$/", "", $base64);
+	return urlencode($base64);
+}
+
+/**
+ * Unserialize les paramètres de recherche
+ */
+function immobilier_search_unserialize($string) {
+	return unserialize(base64_decode($string));
+}
+
+/**
+ * Génère un titre pour les recherche 
+ */
+function immobilier_search_title($type, $params) {
+	$title = array();
+
+	// transaction
+	if($type) {
+		$transaction = immobilier_get_types("name", $type);
+		$title[] = $transaction;
+	}
+	
+	// categories
+	if($params->categorie && $categories = array_filter((array)$params->categorie)) {
+		$parts = array();
+		foreach($categories as $categorie) {
+			$term = taxonomy_get_term($categorie);
+			$parts[] = strtolower($term->name);
+		}
+		$title[] = join(", ", $parts);
+	}
+	
+	// pieces	
+	if($params->pieces && $pieces = array_filter((array)$params->pieces)) {
+		if(count($pieces) == 1) {
+			$pieces = current($pieces);
+			$more = "";
+			if(preg_match("/\+$/", $pieces)) {
+				$pieces = (int)$pieces;
+				$more = " et plus";
+			}
+			$title[] = "$pieces pièce" . ($pieces > 1 ? "s" : "").$more;
+		}
+		
+	}
+	
+	// secteur
+	if($secteur = $params->secteur) {
+		$term = taxonomy_get_term($secteur);
+		$title[] = $term->name;
+	}
+	
+	// altération éventuelle par les autres modules
+	// hook_immobilier_search_title_alter
+	//acreat_alter('immobilier_search_title', $type, $params, &$title);
+	
+	return is_array($title) ? join(" ", $title) : $title;
+}
+
+
+/**
+ * specific variable_get
+ */
+function immobilier_variable_get($string, $default=null) {
+	switch($string) {
+		case "search_pager_limit": 	$default=10; 	break;
+	}
+	return variable_get("immobilier_$string", $default);
+}
+
+/**
+ * specific variable_set
+ */
+function immobilier_variable_set($string, $value=null) {
+	return variable_set("immobilier_$string", $value);
+}
+
+/**
+ * suppression d'un fichier
+ * pour une annonce
+ * @param $file : objet $file ou string $fid
+ */
+function immobilier_file_delete($file) {
+	if(!is_object($file)) {
+		$file = db_fetch_object(db_query('SELECT f.* FROM {files} f WHERE f.fid = %d', $file));
+		if(!$file) return false;
+	}
+	
+	if( file_delete($file->filepath) || !file_exists($file->filepath) ) {
+		db_query("DELETE FROM {immo_files} WHERE fid = %d", $file->fid);
+		db_query("DELETE FROM {files} WHERE fid = %d", $file->fid);
+		
+		// suppression des images de cache
+		if(module_exists("imagecache")) { 
+			imagecache_file_delete($file); 
+		}
+		
+		// suppression des thumbs d'admin éventuels
+		if(module_exists("imagefield")) { 
+			imagefield_file_delete($file);
+		}
+		
+		return true;
+	} 
+	return false;
+}
+
+/**
+ * suppression de l'ensemble des fichiers liés à un node
+ * @param $node : objet $node ou string $nid
+ */
+function immobilier_file_delete_all($node, $type = false) {
+	if(!is_object($node)) {
+		$node = node_load($node);
+		if(!$node) return false;
+	}
+	$sql = 'SELECT * FROM {immo_files} i JOIN {files} f ON f.fid = i.fid WHERE i.vid = %d';
+	if($type) $sql .= " AND i.type = '".db_escape_string($type)."'";
+	$rs = db_query($sql, $node->vid);
+	
+	while($f = db_fetch_object($rs))
+		immobilier_file_delete($f);
+		
+	return true;
+}
+
+/**
+ * array_filter_recursive
+ */
+if(!function_exists('array_filter_recursive')) {
+	function array_filter_recursive($input) { 
+		foreach ($input as &$value) { 
+		  if (is_array($value)) { 
+			$value = array_filter_recursive($value); 
+		  } 
+		}
+		return array_filter($input); 
+	}
+}

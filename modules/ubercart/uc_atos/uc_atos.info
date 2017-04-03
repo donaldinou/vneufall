@@ -1,0 +1,11 @@
+name = SIPS/ATOS Payment system
+description = Integrate SIPS/ATOS Credit cart payment.
+dependencies[] = uc_payment
+package = "Ubercart - payment"
+core = "6.x"
+; Information added by drupal.org packaging script on 2008-11-07
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "uc_atos"
+datestamp = "1226060284"
+

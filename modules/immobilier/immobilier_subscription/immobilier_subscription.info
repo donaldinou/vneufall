@@ -1,0 +1,8 @@
+; 
+name = Subscriptions
+description = Inscription à la notification de nouvelles annonces
+package = Immobilier
+dependencies[] = immobilier
+dependencies[] = token
+dependencies[] = messaging
+core = "6.x"

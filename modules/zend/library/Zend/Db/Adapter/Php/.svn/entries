@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="28"
+   name=""
+   committed-date="2008-01-06T08:34:42.434110Z"
+   url="svn://agoraproduction.com:3343/srv/www/htdocs/web14/files/zend_db/Php"
+   last-author="david"
+   kind="dir"
+   uuid="4ce37cf7-5d27-0410-aafa-bac4ba9a4159"
+   revision="29"/>
+<entry
+   committed-rev="27"
+   name="Dbphp.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2008-01-06T08:30:57.943348Z"
+   checksum="28eec2603f6369f6b792ef4f34529c94"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   name="MDB2"
+   kind="dir"/>
+<entry
+   committed-rev="13"
+   name="Exception.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-02-26T02:41:32.629902Z"
+   checksum="5a5087dffedb19e9b5e8d3ccd088b75f"
+   last-author="firman"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="28"
+   name="Mysqli.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2008-01-06T08:34:42.434110Z"
+   checksum="c367b10946b9fe14603f8b11a4e5c0d4"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="Mssql.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="83391954e8c34d69fba75c2b5fbe7d82"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:31.000000Z"/>
+<entry
+   committed-rev="15"
+   name="Sqlite.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-02-26T02:46:10.794600Z"
+   checksum="b8e62a43c14187e6c5c66721fbefcd90"
+   last-author="firman"
+   kind="file"
+   prop-time="2008-01-06T08:45:31.000000Z"/>
+<entry
+   committed-rev="3"
+   name="Oci8.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="0a3d3b9d67304756ea778c22181f58de"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:31.000000Z"/>
+<entry
+   committed-rev="23"
+   name="Mysql.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-06-17T18:39:35.575380Z"
+   checksum="5284f57e64833344c1208f8b17d916c6"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:31.000000Z"/>
+<entry
+   committed-rev="3"
+   name="Pgsql.php"
+   text-time="2008-01-06T08:45:31.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="78b8728d1280e5c3e85f40b5e8182fd0"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:31.000000Z"/>
+</wc-entries>

@@ -1,0 +1,157 @@
+<?php
+// $Id: nodeblock.module,v 1.4 2008/09/17 22:05:35 rz Exp $
+
+/**
+ * Utility function to tell whether a type is enabled as a node block
+ */
+function nodeblock_type_enabled($type) {
+  if(is_object($type)) {
+    $type = $type->type;
+  }
+  return variable_get('nodeblock_'. $type, 0) ? TRUE : FALSE;
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function nodeblock_form_alter(&$form, $form_state, $form_id) {
+  // content type settings form
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    $form['workflow']['nodeblock'] = array(
+      '#type' => 'radios',
+      '#title' => t('Available as block'),
+      '#default_value' => variable_get('nodeblock_'. $form['#node_type']->type, 0),
+      '#options' => array(0 => t('Disabled'), 1 => t('Enabled')),
+      '#description' => t('Should these nodes be made available as blocks?'),
+    );
+  }
+
+  // node add/edit form
+  if (isset($form['type'])) {
+    $node = $form['#node'];
+    // if enabled adjust the form
+    if ($form_id == $form['type']['#value'] .'_node_form' 
+      && variable_get('nodeblock_'. $node->type, 0)
+      && user_access('administer blocks')) {
+        global $theme_key;
+        $block = $node->nodeblock;  // provided by nodeapi('prepare')
+        
+        $form['nodeblock'] = array(
+          '#type' => 'fieldset',
+          '#title' => t('Block Options'),
+          '#tree' => true,
+        );
+        $block_regions = array(BLOCK_REGION_NONE => '<'. t('none') .'>') + system_region_list($theme_key);
+        $form['nodeblock']['region'] = array(
+          '#type' => 'select',
+          '#title' => t('Region'),
+          '#default_value' => $block['status'] ? (isset($block['region']) ? $block['region'] : system_default_region($theme_key)) : BLOCK_REGION_NONE,
+          '#options' => $block_regions,
+        );
+        $form['nodeblock']['weight'] = array(
+          '#type' => 'weight',
+          '#title' => t('Weight'), 
+          '#default_value' => $block['weight'],
+        );
+    }
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function nodeblock_nodeapi(&$node, $op, $teaser, $page) {
+  // do nothing if not enabled
+  if(!nodeblock_type_enabled($node)) {
+    return;
+  }
+  
+  switch ($op) {
+    case 'prepare':
+      // add nodeblock info to the node object in preparation for the form
+      init_theme();
+      global $theme_key;
+      $node->nodeblock = db_fetch_array(db_query("SELECT * FROM {blocks} WHERE theme = '%s' AND module='%s' AND delta='%d'", $theme_key, 'nodeblock', $node->nid));
+      break;
+      
+    case 'insert':
+    case 'update':
+      // only admins can affect block configuration
+      if(user_access('administer blocks')) {
+        init_theme();
+        global $theme_key;
+        // rehash blocks which will take care of inserting our new nodeblock into
+        // the blocks table if necessary
+        _block_rehash(); 
+  
+        // build block array and save
+        $block = $node->nodeblock;
+        $block['status'] = $block['region'] != BLOCK_REGION_NONE;
+        $block['region'] = $block['status'] ? $block['region'] : '';
+        $block['module'] = 'nodeblock';
+        $block['delta'] = $node->nid;
+        $block['theme'] = $theme_key;
+        
+        db_query("UPDATE {blocks} SET status = %d, weight = %d, region = '%s' WHERE module = '%s' AND delta = '%s' AND theme = '%s'", 
+          $block['status'], $block['weight'], $block['region'], $block['module'], $block['delta'], $block['theme']);
+      }
+      
+      break;
+
+    case 'delete':
+      _block_rehash(); 
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function nodeblock_block($op = 'list', $delta = 0, $edit = array()) {
+  $types = node_get_types();
+  if ($op == 'list') {
+    foreach($types as $type){
+      if(nodeblock_type_enabled($type)) {
+        $result = db_query('SELECT * FROM {node} WHERE type="%s" AND status=1',$type->type);
+        while($node = db_fetch_object($result)){
+          $blocks[$node->nid] = array('info' => $node->title . ' (nodeblock)');
+        }
+      }
+    }
+    return $blocks;
+  }
+  elseif($op == 'view'){
+    $node = node_load($delta);
+    $block['subject'] = $node->title;
+    // using page arg = TRUE since we want the full content (generally speaking)
+    $block['content'] = node_view($node, FALSE, TRUE, TRUE);
+    
+    return $block;
+  }
+}
+
+/**
+ * Implementation of hook_link().
+ */
+function nodeblock_link($type, $node = NULL, $teaser = FALSE) {
+  $links = array();
+  
+  if($type == 'node' && nodeblock_type_enabled($node)) {
+    if(node_access('update', $node)) {
+      $links['nodeblock_edit'] = array(
+        'title' => t('Edit Block'),
+        'href' => 'node/'. $node->nid .'/edit',
+        'query' => drupal_get_destination(),
+      );
+    }
+    if(user_access('administer blocks')) {
+      $links['nodeblock_configure'] = array(
+        'title' => t('Configure Block'),
+        'href' => 'admin/build/block/configure/nodeblock/'. $node->nid,
+        'query' => drupal_get_destination(),
+      );
+    }
+  }
+  
+  return $links;
+}

@@ -1,0 +1,38 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_install()
+ */
+function immobilier_location_install() {
+	$type = new stdClass();
+	$type->type = 'location';
+	$type->name = 'Location';
+	$type->module = 'immobilier_location';
+	drupal_write_record("immo_type", $type);
+	
+	$categories_vid = immobilier_variable_get('categories_vid');
+	$secteurs_vid = immobilier_variable_get('secteurs_vid');
+	
+	//vocabulary_node_types
+	db_query("INSERT vocabulary_node_types (vid, type) VALUES (%d, '%s')", $categories_vid, $type->type);
+	db_query("INSERT vocabulary_node_types (vid, type) VALUES (%d, '%s')", $secteurs_vid, $type->type);
+	
+	// categories
+	$rs = db_query("SELECT tid FROM {term_data} t WHERE vid = %d", $categories_vid);
+	while($term = db_fetch_object($rs))
+		db_query("INSERT INTO immo_type_categorie (type, tid) VALUES ('%s',%d)", $type->type, $term->tid);
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function immobilier_location_uninstall() {  
+	db_query("DELETE FROM immo_type WHERE type = 'location'");
+	db_query("DELETE FROM vocabulary_node_types WHERE type = 'location'");
+	db_query("DELETE FROM immo_type_categorie WHERE type = 'location'");
+}
+

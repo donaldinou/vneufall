@@ -1,0 +1,19 @@
+<?php
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_install()
+ */
+function immobilier_favoris_install() {
+
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function immobilier_favoris_uninstall() {  
+
+}

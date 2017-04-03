@@ -1,0 +1,311 @@
+<?php
+// $Id: menu_block.module,v 1.30 2008/08/25 09:14:24 johnalbin Exp $
+
+/**
+ * @file
+ * Provides configurable blocks of menu items.
+ */
+
+// @TODO: For PHP 4 compatibility we use foreach (array_keys($array) AS $key).
+// When PHP 5 becomes required (Drupal 7.x), use the following faster
+// implementation: foreach ($array AS $key => &$value) {}
+
+/**
+ * Implements hook_menu().
+ */
+function menu_block_menu() {
+  $items['admin/build/block/add-menu-block'] = array(
+    'title' => 'Add menu block',
+    'description' => 'Add a new menu block.',
+    'access arguments' => array('administer blocks'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('menu_block_add_block_form'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'menu_block.admin.inc',
+  );
+  $items['admin/build/block/delete-menu-block'] = array(
+    'title' => 'Delete menu block',
+    'access arguments' => array('administer blocks'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('menu_block_delete'),
+    'type' => MENU_CALLBACK,
+    'file' => 'menu_block.admin.inc',
+  );
+  $items['admin/settings/menu_block'] = array(
+    'title' => 'Menu block',
+    'description' => 'Add a new menu block.',
+    'access arguments' => array('administer blocks'),
+    'page callback' => '_menu_block_by_module_hack', // And, I mean hack.
+    'file' => 'menu_block.pages.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_help().
+ */
+function menu_block_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#menu_block':
+    case 'admin/build/block':
+      include_once './' . drupal_get_path('module', 'menu_block') . '/menu_block.pages.inc';
+      return _menu_block_help($path, $arg);
+  }
+}
+
+/**
+ * Alters the block admin form to add delete links next to menu blocks.
+ */
+function menu_block_form_block_admin_display_form_alter(&$form, $form_state) {
+  include_once './' . drupal_get_path('module', 'menu_block') . '/menu_block.admin.inc';
+  _menu_block_form_block_admin_display_form_alter($form, $form_state);
+}
+
+/**
+ * Implements hook_block().
+ */
+function menu_block_block($op = 'list', $delta = NULL, $edit = NULL) {
+  $function = '_menu_block_block_' . $op;
+  if (function_exists($function)) {
+    return $function($delta, $edit);
+  }
+  else {
+    // "op"s besides "view" are seldom used, so we store them in a separate file.
+    include_once './' . drupal_get_path('module', 'menu_block') . '/menu_block.admin.inc';
+    if (function_exists($function)) {
+      return $function($delta, $edit);
+    }
+  }
+}
+
+/**
+ * Returns the 'view' $op info for hook_block().
+ *
+ * @param $delta
+ *   string The name of the block to render.
+ */
+function _menu_block_block_view($delta) {
+  $data = array();
+
+  // Get the block configuration options.
+  $menu_name = variable_get("menu_block_{$delta}_menu_name", "navigation");
+  $level = variable_get("menu_block_{$delta}_level", 1);
+  $depth = variable_get("menu_block_{$delta}_depth", 0);
+  $expanded = variable_get("menu_block_{$delta}_expanded", 0);
+
+  // Get the default block name
+  $menu_names = menu_get_menus(TRUE);
+  $data['subject'] = $menu_names[$menu_name];
+
+  if ($expanded) {
+    // Get the full, un-pruned tree.
+    $tree = menu_tree_all_data($menu_name);
+    // And add the active trail data back to the full tree.
+    menu_tree_add_active_path($tree);
+  }
+  else {
+    // Get the tree pruned for just the active trail.
+    $tree = menu_tree_page_data($menu_name);
+  }
+
+  // Prune the tree along the active trail to the specified level.
+  if ($level > 1) {
+    $data['subject'] = menu_tree_prune_tree($tree, $level);
+  }
+
+  // Trim the branches that extend beyond the specified depth.
+  if ($depth > 0) {
+    menu_tree_depth_trim($tree, $depth);
+  }
+
+  // Render the tree.
+  $data['content'] = menu_block_tree_output($tree);
+  if ($data['content']) {
+    $classes[] = 'menu-name-' . $menu_name;
+    $classes[] = 'menu-level-' . $level;
+    $classes[] = 'menu-depth-' . $depth;
+    if ($expanded) {
+      $classes[] = 'menu-expanded';
+    }
+    $data['content'] = '<div class="' . check_plain(implode(' ', $classes)) . '">' . $data['content'] . '</div>';
+  }
+
+  return $data;
+}
+
+/**
+ * Add the active trail indicators into the tree.
+ *
+ * The data returned by menu_tree_page_data() has link['in_active_trail'] set to
+ * TRUE for each menu item in the active trail. The data returned from
+ * menu_tree_all_data() does not contain the active trail indicators. This is a
+ * helper function that adds it back in.
+ *
+ * @param $tree
+ *   array The menu tree to prune.
+ * @return
+ *   void
+ */
+function menu_tree_add_active_path(&$tree) {
+  // Grab any menu item to find the menu_name for this tree.
+  $menu_item = current($tree);
+  $tree_with_trail = menu_tree_page_data($menu_item['link']['menu_name']);
+
+  // To traverse the original tree down the active trail, we use a pointer.
+  $subtree_pointer =& $tree;
+
+  // Find each key in the active trail.
+  while ($tree_with_trail) {
+    foreach (array_keys($tree_with_trail) AS $key) {
+      if ($tree_with_trail[$key]['link']['in_active_trail']) {
+        // Set the active trail info in the original tree.
+        $subtree_pointer[$key]['link']['in_active_trail'] = TRUE;
+        // Continue in the subtree, if it exists.
+        $tree_with_trail =& $tree_with_trail[$key]['below'];
+        $subtree_pointer =& $subtree_pointer[$key]['below'];
+        break;
+      }
+      else {
+        unset($tree_with_trail[$key]);
+      }
+    }
+  }
+}
+
+/**
+ * Prune a tree so that it begins at the specified level.
+ *
+ * This function will follow the active menu trail to the specified level.
+ *
+ * @param $tree
+ *   array The menu tree to prune.
+ * @param $level
+ *   int The level of the original tree that will start the pruned tree.
+ * @return
+ *   string Returns the title of pruned tree.
+ */
+function menu_tree_prune_tree(&$tree, $level) {
+  // Get the default menu title.
+  if ($level == 1) {
+    $menu_names = menu_get_menus(TRUE);
+    // Grab any menu item to find the menu_name for this tree.
+    $menu_item = current($tree);
+    $menu_title = $menu_names[$menu_item['link']['menu_name']];
+  }
+  else {
+    // We won't know the title until we've pruned the tree.
+    $menu_title = '';
+  }
+
+  // Trim the upper levels down to the one desired.
+  for ($i=$level; $i > 1; $i--) {
+    $found_active_trail = FALSE;
+    // Examine each element at this level for the active trail.
+    foreach (array_keys($tree) AS $key) {
+      if ($tree[$key]['link']['in_active_trail']) {
+        // Get the title for the pruned tree.
+        $menu_title = $tree[$key]['link']['title'];
+        // Prune the tree to the children of the item in the active trail.
+        $tree = $tree[$key]['below'] ? $tree[$key]['below'] : array();
+        $found_active_trail = TRUE;
+        break;
+      }
+    }
+    // If we don't find the active trail, the active item isn't in the tree we want.
+    if (!$found_active_trail) {
+      $tree = array();
+      break;
+    }
+  }
+
+  return $menu_title;
+}
+
+/**
+ * Prune a tree so it does not extend beyond the specified depth limit.
+ *
+ * @param $tree
+ *   array The menu tree to prune.
+ * @param $depth_limit
+ *   int The maximum depth of the returned tree, 0 for unlimited.
+ * @return
+ *   void
+ */
+function menu_tree_depth_trim(&$tree, $depth_limit) {
+  // Prevent dumb input from returning trimmed tree.
+  if ($depth_limit < 1) { return; }
+
+  // Examine each element at this level to find any possible children.
+  foreach (array_keys($tree) AS $key) {
+    if ($tree[$key]['below'] && $depth_limit > 1) {
+      menu_tree_depth_trim($tree[$key]['below'], $depth_limit-1);
+    }
+    else {
+      // Remove the children items.
+      $tree[$key]['below'] = FALSE;
+      // Turn off the menu styling that shows there were children.
+      $tree[$key]['link']['has_children'] = FALSE;
+    }
+  }
+}
+
+/**
+ * Returns a rendered menu tree.
+ *
+ * This is an optimized version of menu_tree_output() with additional classes
+ * added to the output.
+ *
+ * @param $tree
+ *   array A data structure representing the tree as returned from menu_tree_data.
+ * @return
+ *   string The rendered HTML of that data structure.
+ */
+function menu_block_tree_output(&$tree) {
+  $output = '';
+  $items = array();
+
+  // Pull out just the menu items we are going to render so that we
+  // get an accurate count for the first/last classes.
+  foreach (array_keys($tree) as $key) {
+    if (!$tree[$key]['link']['hidden']) {
+      $items[$key] = array(
+        'link' => $tree[$key]['link'],
+        // To prevent copying the entire child array, we render it first.
+        'below' => !empty($tree[$key]['below']) ? menu_block_tree_output($tree[$key]['below']) : '',
+      );
+    }
+  }
+
+  $num_items = count($items);
+  $i = 1;
+  foreach (array_keys($items) as $key) {
+    // Render the link.
+    $link_class = array();
+    if (!empty($items[$key]['link']['localized_options']['attributes']['class'])) {
+      $link_class[] = $items[$key]['link']['localized_options']['attributes']['class'];
+    }
+    if ($items[$key]['link']['in_active_trail']) {
+      $link_class[] = 'active-trail';
+    }
+    if (!empty($link_class)) {
+      $items[$key]['link']['localized_options']['attributes']['class'] = implode(' ', $link_class);
+    }
+    $link = theme('menu_item_link', $items[$key]['link']);
+    // Render the menu item.
+    $extra_class = array();
+    if ($i == 1) {
+      $extra_class[] = 'first';
+    }
+    if ($i == $num_items) {
+      $extra_class[] = 'last';
+    }
+    $extra_class[] = 'menu-mlid-' . $items[$key]['link']['mlid'];
+    if ($items[$key]['link']['href'] == $_GET['q'] || ($items[$key]['link']['href'] == '<front>' && drupal_is_front_page())) {
+      $extra_class[] = 'active';
+    }
+    $extra_class = !empty($extra_class) ? implode(' ', $extra_class) : NULL;
+    $output .= theme('menu_item', $link, $items[$key]['link']['has_children'], $items[$key]['below'], $items[$key]['link']['in_active_trail'], $extra_class);
+    $i++;
+  }
+  return $output ? theme('menu_tree', $output) : '';
+}

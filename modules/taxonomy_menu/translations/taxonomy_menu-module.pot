@@ -1,0 +1,102 @@
+# $Id: taxonomy_menu-module.pot,v 1.1.2.1 2008/09/10 12:40:05 afief Exp $
+#
+# LANGUAGE translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  taxonomy_menu.inc,v 1.2.2.2 2008/09/09 11:54:04 afief
+#  taxonomy_menu.module,v 1.19.2.2 2008/09/09 15:00:07 afief
+#  taxonomy_menu.info,v 1.2 2008/01/31 16:51:55 brmassa
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2008-09-10 15:18+0300\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: taxonomy_menu.inc:21
+msgid "No"
+msgstr ""
+
+#: taxonomy_menu.inc:22
+msgid "Normal"
+msgstr ""
+
+#: taxonomy_menu.inc:49
+msgid "Module types"
+msgstr ""
+
+#: taxonomy_menu.inc:62
+msgid "Show this category in menu"
+msgstr ""
+
+#: taxonomy_menu.inc:80
+msgid "How should be the first item on the menu? Example: categories/1/2/3, technology/1/2/3"
+msgstr ""
+
+#: taxonomy_menu.inc:81
+msgid "Module page"
+msgstr ""
+
+#: taxonomy_menu.inc:86
+msgid "If checked, number of node per term will be displayed in the menu."
+msgstr ""
+
+#: taxonomy_menu.inc:87
+msgid "Display number of nodes per terms"
+msgstr ""
+
+#: taxonomy_menu.inc:92
+msgid "If checked, only taxonomy terms with members will be shown in the menu."
+msgstr ""
+
+#: taxonomy_menu.inc:93
+msgid "Hide Empty Terms"
+msgstr ""
+
+#: taxonomy_menu.inc:98
+msgid "If checked, then when a term is selected all nodes belonging to subterms are also displayed."
+msgstr ""
+
+#: taxonomy_menu.inc:99
+msgid "Display descendants"
+msgstr ""
+
+#: taxonomy_menu.inc:105
+msgid "Save configuration"
+msgstr ""
+
+#: taxonomy_menu.inc:144
+msgid "Global configuration of taxonomy menu functionality."
+msgstr ""
+
+#: taxonomy_menu.inc:149
+msgid "Taxonomy Menu settings"
+msgstr ""
+
+#: taxonomy_menu.inc:251
+msgid "Home"
+msgstr ""
+
+#: taxonomy_menu.inc:329
+msgid "No content for this category."
+msgstr ""
+
+#: taxonomy_menu.module:0
+msgid "taxonomy_menu"
+msgstr ""
+
+#: taxonomy_menu.info:0
+msgid "Taxonomy Menu"
+msgstr ""
+
+#: taxonomy_menu.info:0
+msgid "Adds links to taxonomy terms to the global navigation menu."
+msgstr ""
+

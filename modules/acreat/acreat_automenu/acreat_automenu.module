@@ -1,0 +1,101 @@
+<?php
+// $Id: automenu.module,v 1.1.4.1 2008/10/10 14:40:11 danielfs Exp $
+
+/**
+ * Implementation of hook_nodeapi().
+ * Fill in menu section values if user left them empty AND there's a parent
+ * menu item selected for this node type and the node is published.
+ */
+function acreat_automenu_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+	$path = 'node/' . $node->nid;
+	$lock = !isset($node->menu['mlid']);
+	
+	switch ($op) {	
+		// ---
+		case 'insert':
+		case 'update':
+		
+			$variable = variable_get('parentmenu' . $node->language . '_' . $node->type, '0');
+			if(!$variable)
+				$variable = variable_get('parentmenu' . '_' . $node->type, '0');
+			
+			$parent_menu = explode(":", $variable);
+			
+			if ($parent_menu[0] == '0' || (($node->menu['link_title'] && !$node->menu['delete']) || !$node->status)) {
+				acreat_automenu_delete_menu($path);
+				break;
+			}
+						
+			$new_menu = array(
+				'link_path' 	=> 'node/' . $node->nid,
+				'link_title' 	=> trim($node->title),
+				'plid' 			=> $parent_menu[1]
+			);
+			
+			if($lock) {
+				$result = db_query("SELECT * FROM `menu_links` WHERE link_path = '%s' AND module = '%s'", array('node/'.$node->nid, 'acreat_automenu'));
+				if($item = db_fetch_array($result)) {
+					$new_menu['mlid'] = $item['mlid'];
+					$new_menu['weight'] = $item['weight'];
+				}
+				$new_menu['module'] = 'acreat_automenu';
+			}
+			
+			if (!menu_link_save($new_menu)) 
+				drupal_set_message(t('There was an error saving the auto-menu link.'), 'error');
+			else 
+				drupal_set_message(t('The page was automatically added to: !menu.', array('!menu' => $parent_menu[0])));
+		break;
+		// ---
+		case 'delete':
+			acreat_automenu_delete_menu($path);
+		break;
+	}
+}	
+	
+	
+/**
+ * Implementation of hook_form_alter().
+ * Add the "Default Parent Menu" section to content type edit node.
+ */
+function acreat_automenu_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    // Get a list of enabled languages.
+    $languages = language_list('enabled');
+    $languages = $languages[1];
+
+    // Shouldn't this be language specific?!
+    $options = array_merge(array("0" => "None"), menu_parent_options(menu_get_menus(), 0));
+
+    // add a selection for "no language" selection... maybe we can find a
+    // better way (I think this is what happens in language neutral situations?)
+
+    $form['workflow']['parentmenu'] = array(
+      '#type' => 'select',
+      '#title' => t('Default parent menu'),
+      '#default_value' => variable_get('parentmenu_' . $form['#node_type']->type, 0),
+      '#options' => $options,  // TODO filter on menu items that are language neutral?
+      '#description' => t('Select the default menu for nodes without a language (i.e. language neutral.)'),
+    );
+
+    foreach ($languages as $language) {
+      $form['workflow']['parentmenu'. $language->language] = array(
+        '#type' => 'select',
+        '#title' => t('Parent menu for !lang nodes', array('!lang' => $language->name)),
+        '#default_value' => variable_get('parentmenu' . $language->language . '_' . $form['#node_type']->type, 0),
+        '#options' => $options,  // TODO filter on menu items of current language
+	'#description' => t('Select the default menu for nodes written in !lang.', array('!lang' => $language->name)),
+      );
+    }
+  }
+}
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+	
+function acreat_automenu_delete_menu($path) {
+	$result = db_query("SELECT mlid FROM `menu_links` WHERE link_path = '%s' AND module = '%s'", array($path, 'acreat_automenu'));
+	while($item = db_fetch_object($result))
+		menu_link_delete($item->mlid);
+}

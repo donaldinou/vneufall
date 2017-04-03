@@ -1,0 +1,54 @@
+<?php
+// $Id: taxonomy_menu_hierarchy.module,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+
+/**
+ * @file
+ *  Enables Hierarchy path to Taxonomy Menu
+ */
+
+/**
+ * Implementation of hook_taxonomy_menu_update()
+ */
+function acreat_taxonomy_menu_mid_taxonomy_menu_update($args=array()) {
+	$mlid = $args['mlid'];
+	$vid = $args['vid'];
+	$plid = variable_get("taxonomy_menu_parent_$vid", 0);
+	if($plid) {
+		$plid = explode(":", $plid);
+		$plid = (int)$plid[1];
+	}
+	$item = array('plid' => $plid);
+	return $item;
+}
+
+/**
+ * Implementation of hook_taxonomy_menu_insert()
+ */
+function acreat_taxonomy_menu_mid_taxonomy_menu_insert($args=array()) {
+	return acreat_taxonomy_menu_mid_taxonomy_menu_update($args);
+}
+
+/**
+ * Implementation of hook_taxonomy_menu_options()
+ * 
+ * @return array
+ *  Uses the value to set the variable taxonomy_menu_<value>_$vid
+ *  $options[value]
+ *   default - optional.  this is what will be used if the varialbe is not set.  if empty then FALSE is used
+ *   #title - required.
+ *   any other form element
+ */
+function acreat_taxonomy_menu_mid_taxonomy_menu_options() {
+
+	$item = array('mlid'=>0);
+    $_options = menu_parent_options(menu_get_menus(), $item);
+	
+	$options['parent'] = array(
+      '#type' => 'select',
+      '#title' => t('Parent item'),
+      'default' => 'primary-links:0',
+      '#options' => $_options
+    );
+	
+	return $options;
+}

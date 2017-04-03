@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="11"
+   name=""
+   committed-date="2007-02-24T20:58:07.834470Z"
+   url="svn://agoraproduction.com:3343/srv/www/htdocs/web14/files/zend_db/Php/MDB2/MDB2/Driver"
+   last-author="firman"
+   kind="dir"
+   uuid="4ce37cf7-5d27-0410-aafa-bac4ba9a4159"
+   revision="29"/>
+<entry
+   name="Function"
+   kind="dir"/>
+<entry
+   committed-rev="3"
+   name="mssql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="dbf8c33a7d2b4e1548ba3bc1b823e8fb"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:29.000000Z"/>
+<entry
+   name="Native"
+   kind="dir"/>
+<entry
+   committed-rev="3"
+   name="sqlite.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="e7be0223548bfbd22db7f7b3e2e1f07a"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:29.000000Z"/>
+<entry
+   committed-rev="3"
+   name="oci8.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="5c44f7ef00dda415587f4e84481c19b6"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:29.000000Z"/>
+<entry
+   name="Manager"
+   kind="dir"/>
+<entry
+   name="Datatype"
+   kind="dir"/>
+<entry
+   name="Reverse"
+   kind="dir"/>
+<entry
+   committed-rev="3"
+   name="mysql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="14855ab14873389b8250bc335e58077e"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+<entry
+   committed-rev="3"
+   name="pgsql.php"
+   text-time="2008-01-06T08:45:30.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="7686d0667b7b7e23bbfc5c03f90e183d"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:30.000000Z"/>
+</wc-entries>

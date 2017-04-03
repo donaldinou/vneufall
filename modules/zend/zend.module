@@ -1,0 +1,184 @@
+<?php
+// $Id: zend.module,v 1.1.2.1.2.10 2008/06/01 18:01:21 robloach Exp $
+
+/**
+ * @file
+ * The Zend module for Drupal ensures that the Zend Framework is installed.
+ */
+ 
+/**
+ * Determines whether or not the Zend Framework include path has been
+ * manually set yet.
+ */
+global $_ZEND_INCLUDE_PATH_SET; 
+
+/**
+ * Implementation of hook_help().
+ */
+function zend_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#zend':
+      return '<p>'. t('The Zend Framework is an open source web application framework for developing PHP 5 web applications.') .'</p>';
+    case 'admin/settings/zend':
+      return '<p>'. t('The Zend Framework is an open source web application framework for developing PHP 5 web applications. The following are configruation options for its installation.') .'</p>';
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function zend_menu() {
+  $items['admin/settings/zend'] = array(
+    'title' => 'Zend Framework',
+    'description' => 'Configuration options for the Zend Framework',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('zend_admin'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'zend.admin.inc',
+  );
+  $items['admin/settings/zend/settings'] = array(
+    'title' => 'Settings',
+    'description' => 'General settings relating to the Zend Framework.',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_requirements().
+ */
+function zend_requirements($phrase) {
+  $requirements = array();
+  if ($phrase == 'runtime') {
+    $requirements['zend'] = array('title' => 'Zend Framework');
+    $version = zend_get_version();
+    if ($version == FALSE) {
+      $requirements['zend']['value'] = t('Not installed');
+      $requirements['zend']['description'] = t('The <a href="@url" target="_blank">Zend Framework</a> was not found. Please <a href="@configure">configure it</a> correctly.', array('@url' => 'http://framework.zend.com', '@configure' => url('admin/settings/zend')));
+      $requirements['zend']['severity'] = REQUIREMENT_WARNING;
+    }
+    else {
+      $requirements['zend']['value'] = $version;
+      $requirements['zend']['severity'] = REQUIREMENT_OK;
+    }
+  }
+  return $requirements;
+}
+
+/**
+ * Ensures that the Zend Framework is installed and ready for use.
+ *
+ * @param $display_message
+ *   TRUE or FALSE depending on whether or not to display a message.
+ * @return
+ *   FALSE if the Zend Framework was not found, the version number otherwise.
+ */
+function zend_ready($display_message = TRUE) {
+  static $zend_version = NULL;
+  if ($zend_version !== NULL) { // Use cached version.
+    return $zend_version;
+  }
+  
+  // Get the version number.
+  if (zend_initialize('Zend_Version')) {
+    return $zend_version = Zend_Version::VERSION;
+  }
+  else {
+    if ($display_message) {
+      drupal_set_message(t('The <a href="@url" target="_blank">Zend Framework</a> was not found. Please <a href="@configure">configure it</a> correctly.', array('@url' => 'http://framework.zend.com', '@configure' => url('admin/settings/zend'))), 'error');
+    }
+    return FALSE;
+  }
+}
+
+/**
+ * Retrive the currently installed Zend Framework version number.
+ *
+ * @return
+ *   The version number of the currently installed Zend Framework.
+ *   FALSE otherwise.
+ */
+function zend_get_version() {
+  return zend_ready(FALSE);
+}
+
+/**
+ * Retrieve the expected path to the Zend Framework.
+ *
+ * @return
+ *   The path where the Zend Framework is to be expected to be installed.
+ */
+function zend_get_path() {
+  return variable_get('zend_path', '');
+}
+
+/**
+ * Set the include path to include the Zend Framework.
+ */
+function zend_set_include_path() {
+  global $_ZEND_INCLUDE_PATH_SET;
+  if ($_ZEND_INCLUDE_PATH_SET === TRUE) {
+    return TRUE;
+  }
+  $path = zend_get_path();
+  $include_path = get_include_path() . PATH_SEPARATOR . realpath($path);
+  return $_ZEND_INCLUDE_PATH_SET = (set_include_path($include_path) === FALSE) ? FALSE : TRUE;
+}
+
+/**
+ * Includes a file from the Zend Framework.
+ *
+ * @param $file
+ *   The file to include.
+ *   Some examples are: "Zend/Gdata.php", "Zend/Version.php", etc.
+ * @return
+ *   TRUE or FALSE depending on if the file was included successfully.
+ */
+function zend_include($file) {
+  static $included = array();
+  if (isset($included[$file])) {
+    return $included[$file];
+  }
+  if (zend_set_include_path()) {
+    try {
+      $included[$file] = @include_once($file);
+    }
+    catch (Exception $e) {
+      $included[$file] = FALSE;
+    }
+  }
+  return isset($included[$file]) ? $included[$file] : FALSE;
+}
+
+/**
+ * Includes a file from the Zend Framework. Results in a fatal error on fail.
+ */
+function zend_require($file) {
+  if (zend_set_include_path()) {
+    require_once $file;
+  }
+  return TRUE;
+}
+
+/**
+ * Loads a class from the Zend Framework.
+ *
+ * @param $class
+ *   The class to load ("Zend_Gdata", "Zend_Session", etc).
+ * @return
+ *   TRUE or FALSE depending on if the class was loaded successfully.
+ */
+function zend_initialize($class) {
+  if (zend_include('Zend/Loader.php')) {
+    try {
+      Zend_Loader::loadClass($class);
+    }
+    catch (Zend_Exception $e) {
+      return FALSE;
+    }
+    return TRUE;
+  }
+  return FALSE;
+}

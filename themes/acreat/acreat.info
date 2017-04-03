@@ -1,0 +1,14 @@
+; $Id: acreat.info,v 1.5 2007/07/01 23:27:32 goba Exp $
+name = Acreat
+description = Description du thème
+version = VERSION
+core = 6.x
+engine = phptemplate
+stylesheets[all][] = style.css
+stylesheets[print][] = print.css
+
+; Information added by drupal.org packaging script on 2008-10-22
+version = "1.0"
+project = "drupal"
+datestamp = "1224703816"
+

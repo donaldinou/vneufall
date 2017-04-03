@@ -1,0 +1,35 @@
+<?php
+// $Id: zend_mail.module,v 1.1.2.3 2008/06/01 17:15:56 mustafau Exp $
+
+/**
+ * @file
+ * The Zend module for Drupal ensures that the Zend Framework is installed.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function zend_mail_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#zend_mail':
+      return '<p>'. t('The Zend_Mail module uses the Zend Framework to send emails.') .'</p>';
+    case 'admin/settings/zend/mail':
+      return '<p>'. t('The Zend_Mail module uses the Zend Framework to send emails.') .'</p>';
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function zend_mail_menu() {
+  $items['admin/settings/zend/mail'] = array(
+    'title' => 'Mail',
+    'description' => 'Configuration options for Zend Mail',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('zend_mail_admin'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'zend_mail.admin.inc',
+  );
+  return $items;
+}

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wc-entries
+   xmlns="svn:">
+<entry
+   committed-rev="3"
+   name=""
+   committed-date="2007-01-19T05:38:29.668773Z"
+   url="svn://agoraproduction.com:3343/srv/www/htdocs/web14/files/zend_db/Php/MDB2/MDB2/Driver/Function"
+   last-author="david"
+   kind="dir"
+   uuid="4ce37cf7-5d27-0410-aafa-bac4ba9a4159"
+   revision="29"/>
+<entry
+   committed-rev="3"
+   name="mssql.php"
+   text-time="2008-01-06T08:45:28.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="6ecb979374159dc5e3a83c728c3c9e6c"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="3"
+   name="sqlite.php"
+   text-time="2008-01-06T08:45:28.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="42dfd5c6a0a2467036d3a672d70f4da3"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="3"
+   name="oci8.php"
+   text-time="2008-01-06T08:45:29.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="d2ace456b976720883d8aed1e92bfed1"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="3"
+   name="mysql.php"
+   text-time="2008-01-06T08:45:29.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="746f0dee9ee3674f5453ea0450b9d2c6"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="3"
+   name="pgsql.php"
+   text-time="2008-01-06T08:45:29.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="22e6e9aa169dd62d8f8f113496479ce4"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+<entry
+   committed-rev="3"
+   name="Common.php"
+   text-time="2008-01-06T08:45:29.000000Z"
+   committed-date="2007-01-19T05:38:29.668773Z"
+   checksum="bc6ca6c32e486b78ca84645ca2cfa575"
+   last-author="david"
+   kind="file"
+   prop-time="2008-01-06T08:45:28.000000Z"/>
+</wc-entries>

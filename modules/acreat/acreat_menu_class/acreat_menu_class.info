@@ -1,0 +1,7 @@
+; $Id$
+name = Menu Item Class
+description = Permet de spécifier une ou plusieurs classes spécifique pour chaque item de menu
+package = Acreat
+dependencies[] = acreat
+core = 6.x
+version = 6.x-1.0

@@ -1,0 +1,145 @@
+<?php
+// $Id: thumb.install,v 1.1 2008/11/24 09:28:45 davyvandenbremt Exp $
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function thumb_install() {
+  drupal_install_schema('thumb');
+
+  $link = array('!link' => l(t('Administer > Site building > Thumb'), 'admin/build/thumb'));
+  drupal_set_message(t("Thumb presets can be managed under !link", $link));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function thumb_uninstall() {
+  drupal_uninstall_schema('thumb');
+
+  db_query("DELETE FROM {variable} WHERE name LIKE 'thumb_%'");
+  cache_clear_all('variables', 'cache');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function thumb_schema() {
+  $schema['thumb_preset'] = array(
+    'description' => t("Stores thumb presets."),
+    'fields' => array(
+      'pid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => t("The primary identifier for a thumb preset."),
+      ),
+      'identifier' => array(
+        'type' => 'varchar',
+        'default' => '',
+        'length' => 32,
+        'not null' => TRUE,
+        'description' => t('Identifier of the preset.'),
+      ),
+      'description' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+        'description' => t('Description of this preset.'),
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+        'description' => t('The values for the data in this preset.'),
+      ),
+    ),
+    'primary key' => array('pid'),
+    'unique keys' => array(
+      'identifier' => array('identifier'),
+    ),
+    'indexes' => array(
+       'pid' => array('pid'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_requirements().
+ */
+function thumb_requirements($phase) {
+  $requirements = array();
+  
+  $t = get_t();
+  
+  switch ($phase) {
+    case 'install':
+    case 'runtime':
+    $path = drupal_get_path('module', 'thumb');
+    if (!file_exists($path .'/phpThumb/')) {
+      $requirements['thumb'] = array(
+        'title' => $t('Thumb'),
+        'description' => $t('In order for the Thumb module to work correctly, the phpThumb directory must exist at !path.', array('!path' => $path .'/phpThumb')),
+        'severity' => $phase == 'install' ? REQUIREMENT_WARNING : REQUIREMENT_ERROR,
+        'value' => $t('Install phpThumb'),
+      );
+    }
+    elseif (!file_exists($path .'/phpThumb/phpthumb.class.php')) {
+      $requirements['thumb'] = array(
+        'title' => $t('Thumb'),
+        'description' => $t('The !path path exists but it appears that the directory structure underneath is incorrect. Please check that !phpthumb exist.', array('!path' => $path .'/phpThumb', '%phpthumb' => $path .'/phpthumb/phpthumb.class.php')),
+        'severity' => $phase == 'install' ? REQUIREMENT_WARNING : REQUIREMENT_ERROR,
+        'value' => $t('Install phpThumb'),
+      );
+    }
+    elseif ($phase == 'runtime') {
+      $requirements['thumb'] = array(
+        'title' => $t('Thumb'),
+        'severity' => REQUIREMENT_OK,
+        'value' => $t('Installed correctly'),
+      );
+    }
+  }
+  
+  if ($phase == 'runtime') {
+
+    $thumb_directory = file_create_path() .'/thumb';
+    
+    if (!file_check_directory($thumb_directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS)) {
+      if (!is_dir($thumb_directory)) {
+        $requirements['thumb_directory'] = array(
+          'title' => $t('Thumb files directory'),
+          'value' => $t('%p does not a directory or is not readable by the webserver.', array('%p' => $thumb_directory)),
+          'severity' => REQUIREMENT_ERROR,
+        );
+      }
+      elseif (!is_writable($thumb_directory)) {
+        $requirements['thumb_directory'] = array(
+          'title' => $t('Thumb files directory'),
+          'value' => $t('%p is not writeable by the webserver.', array('%p' => $thumb_directory)),
+          'severity' => REQUIREMENT_ERROR,
+        );
+      }
+      else {
+        $requirements['thumb_directory'] = array(
+          'title' => $t('Thumb files directory'),
+          'value' => $t('An unknown error occured.'),
+          'description' => $t('An unknown error occured trying to verify %p is a directory and is writable.', array('%p' => $thumb_directory)),
+          'severity' => REQUIREMENT_ERROR,
+        );
+      }
+    }
+
+    if (!is_writable(file_directory_temp())) {
+      $requirements['thumb_tmp_directory'] = array(
+        'title' => $t('Thumb files directory'),
+        'value' => $t('%p is not writeable by the webserver.', array('%p' => file_directory_temp())),
+        'severity' => REQUIREMENT_ERROR,
+      );
+    }
+  }
+  
+  return $requirements;
+}

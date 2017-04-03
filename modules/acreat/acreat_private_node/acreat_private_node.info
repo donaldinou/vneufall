@@ -1,0 +1,7 @@
+; $Id$
+name = Private Node
+description = Ajoute une option "privé" dans la publication d'un node pour demander un login et un mot de passe pour y accéder
+package = Acreat
+dependencies[] = acreat
+core = 6.x
+version = 6.x-1.0

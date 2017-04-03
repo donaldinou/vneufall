@@ -1,0 +1,13 @@
+; $Id: zend.info,v 1.1.2.1.2.1 2007/12/31 21:22:30 robloach Exp $
+name = Zend Framework
+description = Ensures that the Zend Framework is installed.
+package = Zend Framework
+core = 6.x
+php = 5.1.4
+
+; Information added by drupal.org packaging script on 2008-06-02
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "zend"
+datestamp = "1212365498"
+

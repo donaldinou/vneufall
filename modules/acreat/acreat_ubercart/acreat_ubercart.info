@@ -1,0 +1,6 @@
+; $Id: acreat_taxonomy_menu_mid.info,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+core          = "6.x"
+dependencies[] = acreat
+description   = "Ajoute des fonctionnalités à Ubercart"
+name          = "Ubercart - Acreat"
+package       = Acreat

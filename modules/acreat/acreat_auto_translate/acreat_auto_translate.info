@@ -1,0 +1,8 @@
+; $Id$
+name = Automatic Translate
+description = Affiche automatiquement la version traduite d'un node dans la langue actuelle, ou dans la langue par défaut.
+package = Acreat
+dependencies[] = acreat
+dependencies[] = translation
+core = 6.x
+version = 6.x-1.0

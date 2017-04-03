@@ -1,0 +1,96 @@
+<?php
+// $Id: immobilier.module,v 1.0 2009/09/08 11:30:00$
+
+/*******************************************************************************
+ * HOOKS DRUPAL
+ ******************************************************************************/
+
+/**
+ * Implementation de hook_cron
+ */
+function immobilier_transport_cron() {
+	// distance transports en commun
+	db_query("DELETE FROM immo_transport_station_annonce");
+	$rs = db_query("
+		INSERT INTO immo_transport_station_annonce (
+			SELECT nid,
+				sid,
+				((ACOS(SIN(immo_annonce.latitude * PI() / 180) * SIN(immo_transport_station.latitude * PI() / 180) + COS(immo_annonce.latitude * PI() / 180) * COS(immo_transport_station.latitude * PI() / 180) * COS((immo_annonce.longitude - immo_transport_station.longitude) * PI() / 180)) * 180 / PI()) * 60 * 1.1515)*1.609344 AS distance
+			FROM immo_annonce, immo_transport_station
+			WHERE immo_annonce.latitude IS NOT NULL
+			HAVING distance < 0.5
+	)");
+}
+
+/**
+ * Implementation de hook_form_alter
+ */
+function immobilier_transport_form_alter($form, $form_state, $form_id) {
+	/*
+	$values = $form_state["values"];
+	
+	if($form_id == "immobilier_search_form_location") {
+		$form['transport'] = array(
+			'#type' => 'checkbox', 
+			'#title' => "Proche d'une station de métro (- de 500m)",
+			'#return_value' => 0.5,
+			'#default_value' => $values->transport,
+			'#weight' => 99
+		);
+	}
+	*/
+}
+
+
+/*******************************************************************************
+ * HOOKS IMMOBILIER
+ ******************************************************************************/
+ 
+/**
+ * Implementation de hook_immobilier_sql
+ */
+function immobilier_transport_immobilier_sql() {
+	return array(
+		"join" => "
+			LEFT JOIN {immo_transport_station_annonce} sa ON annonce.nid = sa.nid 
+			LEFT JOIN {immo_transport_station} s ON sa.sid = s.sid 
+		",
+		"cols" => "
+			SUBSTRING(MIN(CONCAT(LPAD(0+sa.distance,10,'0'), s.station)),11) as station,
+			MIN(0+sa.distance) as station_distance
+		"	
+	);
+}
+
+/**
+ * Implementation de hook_immobilier_search_sql
+ */
+function immobilier_transport_immobilier_search_sql($type, $params) {
+	/*
+	if($params->transport) {
+		$sql['where'] = sprintf("sa.distance <= %f", $params->transport);
+	}
+	return $sql;
+	*/
+}
+
+/*******************************************************************************
+ * PREPROCESS
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * FORMULAIRES
+ ******************************************************************************/
+ 
+/*******************************************************************************
+ * PAGES / CALLBACK
+ ******************************************************************************/
+
+/*******************************************************************************
+ * THEMES
+ ******************************************************************************/
+
+/*******************************************************************************
+ * DIVERS
+ ******************************************************************************/
+  

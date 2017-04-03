@@ -1,0 +1,14 @@
+; $Id: zend_mail.info,v 1.1.2.1 2007/12/31 21:22:30 robloach Exp $
+name = Zend Mail
+description = "Uses the Zend Framework&rsquo;s Zend_Mail to send emails."
+package = Zend Framework
+core = 6.x
+php = 5.1.4
+dependencies[] = zend
+
+; Information added by drupal.org packaging script on 2008-06-02
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "zend"
+datestamp = "1212365498"
+

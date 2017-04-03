@@ -1,0 +1,12 @@
+; $Id: acreat_taxonomy_menu_mid.info,v 1.1.2.1 2009/03/01 05:07:35 indytechcook Exp $
+core          = "6.x"
+dependencies[] = acreat
+dependencies[] = taxonomy
+dependencies[] = taxonomy_menu
+description   = "Permet de spécifier un élément de menu parent pour les termes"
+name          = "Taxonomy Menu Parent - Acreat"
+package       = Taxonomy Menu
+
+; Information added by drupal.org packaging script on 2009-03-14
+version = "6.x-2.0"
+core = "6.x"
